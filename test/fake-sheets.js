@@ -48,6 +48,7 @@ class FakeSheet {
     this.rowHeights = new Map();
     this.colWidths = new Map();
     this.hiddenCols = new Set();
+    this.hiddenRows = new Set();
     this.frozenRows = 0;
     this.hidden = false;
     this.gridlinesHidden = false;
@@ -97,6 +98,9 @@ class FakeSheet {
   setColumnWidth(c, w) { this.colWidths.set(c, w); }
   setColumnWidths(c, n, w) { for (let i = 0; i < n; i++) this.colWidths.set(c + i, w); }
   hideColumns(c, n = 1) { for (let i = 0; i < n; i++) this.hiddenCols.add(c + i); }
+  showColumns(c, n = 1) { for (let i = 0; i < n; i++) this.hiddenCols.delete(c + i); }
+  hideRows(r, n = 1) { for (let i = 0; i < n; i++) this.hiddenRows.add(r + i); }
+  showRows(r, n = 1) { for (let i = 0; i < n; i++) this.hiddenRows.delete(r + i); }
   setFrozenRows(n) { this.frozenRows = n; }
   setHiddenGridlines(b) { this.gridlinesHidden = b; }
   setTabColor(c) { this.tabColor = c; }
@@ -120,7 +124,7 @@ class FakeSheet {
     return {
       size: [this.maxRows, this.maxCols], hidden: this.hidden, tabColor: this.tabColor, frozenRows: this.frozenRows,
       gridlinesHidden: this.gridlinesHidden, rowHeights: sortMap(this.rowHeights), colWidths: sortMap(this.colWidths),
-      hiddenCols: [...this.hiddenCols].sort((a, b) => a - b), merges: [...this.merges].sort(), cfRules: this.cfRules, cells,
+      hiddenCols: [...this.hiddenCols].sort((a, b) => a - b), hiddenRows: [...this.hiddenRows].sort((a, b) => a - b), merges: [...this.merges].sort(), cfRules: this.cfRules, cells,
     };
   }
 }
@@ -184,6 +188,12 @@ class FakeRange {
     return this;
   }
   setBackground(v) { return this.fmt('bg', v); }
+  /** Per-cell versions of the setters above, taking a 2D array the size of the range. */
+  fmtEach(key, vals) { return this.each((c, i, j) => { c.fmt[key] = plain(vals[i][j]); }); }
+  setBackgrounds(vals) { return this.fmtEach('bg', vals); }
+  setFontColors(vals) { return this.fmtEach('color', vals); }
+  setFontWeights(vals) { return this.fmtEach('weight', vals); }
+  setHorizontalAlignments(vals) { return this.fmtEach('halign', vals); }
   setFontFamily(v) { return this.fmt('font', v); }
   setFontColor(v) { return this.fmt('color', v); }
   setFontSize(v) { return this.fmt('size', v); }

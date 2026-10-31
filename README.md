@@ -14,7 +14,7 @@ You only type into the data tabs. Everything else is drawn from them.
 | Categories | yes | Category names, with optional Min/Max hours per week |
 | Catalog | yes | Every item: which side of the grid (Schedule / Activities), category, color, description, Breakdown checkbox |
 | Week Plan | yes | When each item happens: item, optional label, days (`Mon-Fri`, `Tue, Thu`), start, end, which grid |
-| Breakdowns | steps only | One group per item with Breakdown checked; you fill in steps and minutes, the view beside it is drawn |
+| Breakdowns | steps only | One group per checked item, by start time. You type Step and Min; the 5-minute view beside it is drawn |
 | Weekdays / Weekends | no | The grids, drawn in 30-minute chunks *(coming)* |
 | Stats | no | Hours per category against targets *(coming)* |
 
@@ -27,6 +27,16 @@ any other directly, and names must be unique across all files.
 |---|---|
 | `Config.js` | Every setting: tab names, column layouts, days, grids, the time range |
 | `Data.js` | Reading the data tabs into plain objects, and reporting rows that can't be used |
+| `Breakdowns.js` | The Breakdowns tab: reading typed steps, grouping by checked item, the 5-minute clock-time views |
+| `Triggers.js` | Entry points: the 🗓️ Schedule menu, `onEdit` auto-redraw, the document lock |
+| `Drawing.js` | Small helpers every drawn tab uses (clearing a sheet, growing it, reporting data problems) |
+
+### How Breakdowns keeps your steps
+
+The tab is redrawn from scratch on every change, after first reading the steps already on it. A hidden key
+column (A) records which item each row belongs to; title rows are marked `§Item`. A row you insert without a key
+joins the group above it. Unchecked items move below a hidden `§§` marker row with their steps, and come back
+when re-checked.
 
 ## Conventions
 
@@ -44,8 +54,11 @@ Same as house-tasks:
 ## Checking a change: `npm test`
 
 `test/` holds a small stand-in for Google Sheets (copied from house-tasks) that runs the script on your
-computer. `test/fixtures/schedule.json` is a copy of the real data tabs; `test/data.js` checks that it reads
-cleanly and that broken rows are reported instead of crashing.
+computer. `test/fixtures/schedule.json` is a copy of the real data tabs.
+
+- `test/data.js`: the data reads cleanly, and broken rows are reported instead of crashing.
+- `test/breakdowns.js`: typed steps survive every redraw, views follow the Week Plan, overflow is flagged,
+  unchecking/rechecking keeps steps, and redrawing an unchanged tab changes nothing.
 
 ## Workflow
 
