@@ -6,11 +6,15 @@
 
 // ---------------------------------------------------------------- entry point
 
-/** Redraw the Breakdowns tab from `schedule` (see readSchedule_). */
-function drawBreakdowns_(schedule) {
+/** Redraw the Breakdowns tab from `schedule` (see readSchedule_), skipping it if unchanged unless `force`. */
+function drawBreakdowns_(schedule, force) {
+  const page = layoutBreakdowns_(shownGroups_(schedule));
+  const plan = redrawPlan_(TABS.breakdowns, page, { viewCount: page.viewCount, BREAKDOWNS }, force);
+  if (!plan.draw) return;
   const ss = SpreadsheetApp.getActive();
   const sh = ss.getSheetByName(TABS.breakdowns) || ss.insertSheet(TABS.breakdowns);
-  paintPage_(sh, layoutBreakdowns_(shownGroups_(schedule)));
+  paintPage_(sh, page, plan.resize);
+  plan.remember();
 }
 
 // ---------------------------------------------------------------- deciding what to draw
@@ -138,15 +142,19 @@ function viewColumn_(k, offset) {
 
 // ---------------------------------------------------------------- painting
 
-/** Write a laid-out page onto a blank tab sized exactly to it, then set widths and frozen rows. */
-function paintPage_(sh, page) {
+/**
+ * Write a laid-out page onto a blank tab sized exactly to it. Column widths and frozen rows are only set when
+ * `resize` (the number of views changed, or the tab is new). Rows are always the default height here.
+ */
+function paintPage_(sh, page, resize) {
   const c = BREAKDOWNS.col;
   const w = BREAKDOWNS.widths;
   const nCols = c.firstView + page.viewCount * BREAKDOWNS.view.width - 1;
 
-  clearSheet_(sh);
+  clearSheet_(sh, true);
   fitSheetSize_(sh, page.rows.length, nCols);
   paintRows_(sh, 1, page.rows, nCols);
+  if (!resize) return;
 
   // Column widths: margin, then each view
   sh.setColumnWidth(c.margin, w.margin);

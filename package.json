@@ -6,6 +6,6 @@
     "@types/google-apps-script": "^1.0.0"
   },
   "scripts": {
-    "test": "TZ=America/Los_Angeles node test/data.js && TZ=America/Los_Angeles node test/breakdowns.js && TZ=America/Los_Angeles node test/grid.js"
+    "test": "TZ=America/Los_Angeles node test/data.js && TZ=America/Los_Angeles node test/breakdowns.js && TZ=America/Los_Angeles node test/grid.js && TZ=America/Los_Angeles node test/redraw.js"
   }
 }

@@ -236,6 +236,7 @@ class FakeBook {
     const m = a1.match(/^'?([^'!]+)'?!(.+)$/);
     return this.getSheetByName(m[1]).getRange(m[2]);
   }
+  deleteSheet(sh) { this.sheets = this.sheets.filter((s) => s !== sh); }
   insertSheet(n) { const s = new FakeSheet(this, n); this.sheets.push(s); this.active = s; return s; }
   getActiveSheet() { return this.active; }
   setActiveSheet(s) { this.active = s; return s; }
@@ -276,6 +277,13 @@ function makeEnvironment(startTime) {
   const pad = (n) => String(n).padStart(2, '0');
   const DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const props = new Map();
+  const documentProperties = {
+    getProperty: (k) => (props.has(k) ? props.get(k) : null),
+    setProperty: (k, v) => { props.set(k, String(v)); return documentProperties; },
+    setProperties: (o) => { Object.entries(o).forEach(([k, v]) => props.set(k, String(v))); return documentProperties; },
+    deleteProperty: (k) => { props.delete(k); return documentProperties; },
+  };
   const globals = {
     Date: FakeDate,
     SpreadsheetApp: {
@@ -301,7 +309,11 @@ function makeEnvironment(startTime) {
     },
     LockService: { getDocumentLock: () => ({ waitLock() {}, releaseLock() {} }) },
     Session: { getScriptTimeZone: () => 'America/Los_Angeles' },
+    PropertiesService: { getDocumentProperties: () => documentProperties },
     Utilities: {
+      DigestAlgorithm: { MD5: 'md5' },
+      computeDigest: (alg, text) => [...require('crypto').createHash(alg).update(text).digest()],
+      base64Encode: (bytes) => Buffer.from(bytes).toString('base64'),
       formatDate: (d, tz, pattern) => pattern.replace(/EEEE|MMMM|MMM|yyyy|d/g, (t) => ({
         EEEE: DAY[d.getDay()], MMMM: MON[d.getMonth()], MMM: MON[d.getMonth()].slice(0, 3), yyyy: String(d.getFullYear()), d: String(d.getDate()),
       })[t]),

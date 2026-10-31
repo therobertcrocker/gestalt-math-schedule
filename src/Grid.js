@@ -6,33 +6,41 @@
 
 // ---------------------------------------------------------------- entry points
 
-/** Draw the Weekdays tab. Returns any overlap problems found, for the caller to report. */
-function drawWeekdays_(schedule) {
-  return drawGrid_(TABS.weekdays, WEEKDAY_COLUMNS, schedule);
+/** Draw the Weekdays tab (skipped if unchanged, unless `force`). Returns overlap problems, for the caller to report. */
+function drawWeekdays_(schedule, force) {
+  return drawGrid_(TABS.weekdays, WEEKDAY_COLUMNS, schedule, force);
 }
 
-/** Draw the Weekends tab: home Sat–Sun, then travel Fri–Sun. Returns any overlap problems found. */
-function drawWeekends_(schedule) {
-  return drawGrid_(TABS.weekends, WEEKEND_COLUMNS, schedule);
+/** Draw the Weekends tab: home Sat–Sun, then travel Fri–Sun. Returns overlap problems. */
+function drawWeekends_(schedule, force) {
+  return drawGrid_(TABS.weekends, WEEKEND_COLUMNS, schedule, force);
 }
 
 /**
- * Draw one grid tab with the given day columns ([{ day, grid, title }]) from the schedule.
- * Returns problems for items on the same side of the same day that overlap.
+ * Draw one grid tab with the given day columns ([{ day, grid, title }]) from the schedule. Skips the tab when
+ * nothing on it would change, and only sets row heights and column widths when the grid's shape changed.
+ * Returns problems for items on the same side of the same day that overlap (whether or not the tab was redrawn).
  */
-function drawGrid_(tabName, columns, schedule) {
-  const ss = SpreadsheetApp.getActive();
-  const sh = ss.getSheetByName(tabName) || ss.insertSheet(tabName);
+function drawGrid_(tabName, columns, schedule, force) {
   const placed = placeItems_(columns, schedule);
   const page = layoutGrid_(columns, placed.blocks);
+  const plan = redrawPlan_(tabName, page, { nRows: page.rows.length, nCols: page.nCols, grids: columns.map(c => c.grid), LAYOUT }, force);
+  if (!plan.draw) return placed.problems;
 
-  clearSheet_(sh);
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(tabName) || ss.insertSheet(tabName);
+  clearSheet_(sh, !plan.resize);
   fitSheetSize_(sh, page.rows.length, page.nCols);
   paintRows_(sh, 1, page.rows, page.nCols);
   page.merges.forEach(([row, col, nRows, nCols]) => sh.getRange(row, col, nRows, nCols).merge());
   drawLabelBoxes_(sh, page.boxes);
+  if (plan.resize) sizeGrid_(sh, columns, page);
+  plan.remember();
+  return placed.problems;
+}
 
-  // Sizes: alternating chunk/divider rows, and the fixed column pattern
+/** Row heights (alternating chunk/divider rows), the fixed column pattern, and frozen headers. */
+function sizeGrid_(sh, columns, page) {
   page.rows.forEach((_, i) => sh.setRowHeight(i + 1, (i % 2 === 0) ? LAYOUT.heights.chunk : LAYOUT.heights.line));
   sh.setColumnWidth(LAYOUT.hourCol, LAYOUT.hourWidth);
   sh.setColumnWidth(LAYOUT.hourCol + 1, LAYOUT.gutterWidth);
@@ -40,7 +48,6 @@ function drawGrid_(tabName, columns, schedule) {
   sectionBreakColumns_(columns).forEach(start => LAYOUT.sectionBreak.forEach((part, offset) => sh.setColumnWidth(start + offset, part.width)));
   sh.setFrozenRows(LAYOUT.subHeaderRow + 1);
   sh.setFrozenColumns(LAYOUT.hourCol + 1);
-  return placed.problems;
 }
 
 // ---------------------------------------------------------------- placing items

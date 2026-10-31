@@ -34,12 +34,14 @@ any other directly, and names must be unique across all files.
 | `Breakdowns.js` | The Breakdowns tab (view only): one group per checked item, the clock-time views |
 | `Grid.js` | The week grids (Weekdays, Weekends): placing Week Plan rows into 30-minute chunks, overlap checks, label boxes |
 | `Triggers.js` | Entry points: the 🗓️ Schedule menu, `onEdit` auto-redraw, the document lock |
-| `Drawing.js` | Helpers every drawn tab uses: clearing a sheet, the batched row painter, reporting data problems |
+| `Drawing.js` | Helpers every drawn tab uses: clearing a sheet, the batched row painter, fingerprints for skipping unchanged tabs, reporting data problems |
 
 ### Input tabs vs drawn tabs
 
 Inputs: Categories, Catalog, Week Plan, Steps. Drawn: Breakdowns, Weekdays, Weekends (and Stats, coming). Editing an
-input tab redraws the drawn tabs; drawn tabs can be rebuilt any time with **🗓️ Schedule → 🔄 Refresh everything**.
+input tab redraws only the drawn tabs whose content would change: each drawn tab keeps a fingerprint of the page it
+last drew (in the document's properties) and is skipped when the new page matches, and row heights and column widths
+are only set when a tab's shape changes. **🗓️ Schedule → 🔄 Refresh everything** redraws every tab from scratch.
 The first refresh after this version creates the Steps tab and moves over any steps typed on the old Breakdowns
 layout, including ones parked in its hidden holding area.
 
@@ -67,6 +69,8 @@ computer. `test/fixtures/schedule.json` is a copy of the real data tabs.
 - `test/grid.js`: every label lands in the same cell as on the hand-built Schedule Planning tab, with the same
   bars, row heights and column widths; label boxes; overlaps are reported; Weekends puts home and travel days
   side by side.
+- `test/redraw.js`: edits only redraw what they change, sizes are only set when needed, a repaint matches drawing
+  from scratch, and Refresh everything always redraws.
 
 ## Workflow
 

@@ -44,8 +44,11 @@ function hslToHex_(h, s, l) {
   return '#' + [r, g, b].map(v => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('').toUpperCase();
 }
 
-/** Wipe a sheet back to blank: values, formats, merges, dropdowns, highlight rules, hidden rows and columns. */
-function clearSheet_(sh) {
+/**
+ * Wipe a sheet back to blank: values, formats, merges, dropdowns, highlight rules, hidden rows and columns.
+ * Row heights are reset to the default too, unless `keepSizes` (the caller knows they're already right).
+ */
+function clearSheet_(sh, keepSizes) {
   const all = sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns());
   sh.showRows(1, sh.getMaxRows());
   sh.showColumns(1, sh.getMaxColumns());
@@ -53,7 +56,35 @@ function clearSheet_(sh) {
   sh.clear();
   all.clearDataValidations();
   sh.clearConditionalFormatRules();
-  sh.setRowHeights(1, sh.getMaxRows(), 21);
+  if (!keepSizes) sh.setRowHeights(1, sh.getMaxRows(), 21);
+}
+
+// ---------------------------------------------------------------- skipping work that's already done
+
+/**
+ * How much of a drawn tab needs redrawing, judged against what was last drawn there:
+ *  - draw:   the laid-out page differs (or `force`, or the tab doesn't exist yet). If false, skip the tab entirely.
+ *  - resize: the page's shape (row count, columns, widths) differs, so row heights and column widths need setting.
+ * Call remember() once the tab has been drawn. Fingerprints are kept in the document's properties.
+ */
+function redrawPlan_(tabName, page, shape, force) {
+  const props = PropertiesService.getDocumentProperties();
+  const isNew = !SpreadsheetApp.getActive().getSheetByName(tabName);
+  const pageKey = `drawn:${tabName}:page`;
+  const shapeKey = `drawn:${tabName}:shape`;
+  const pagePrint = fingerprint_(page);
+  const shapePrint = fingerprint_(shape);
+  return {
+    draw: force || isNew || props.getProperty(pageKey) !== pagePrint,
+    resize: force || isNew || props.getProperty(shapeKey) !== shapePrint,
+    remember: () => props.setProperties({ [pageKey]: pagePrint, [shapeKey]: shapePrint }),
+  };
+}
+
+/** A short fingerprint of any value (Maps and Sets included): equal values give equal fingerprints. */
+function fingerprint_(value) {
+  const json = JSON.stringify(value, (_, v) => (v instanceof Map ? [...v.entries()] : v instanceof Set ? [...v] : v));
+  return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, json));
 }
 
 /**

@@ -9,9 +9,9 @@ function onOpen() {
     .addToUi();
 }
 
-/** Menu: redraw every drawn tab. */
+/** Menu: redraw every drawn tab from scratch, even ones that look unchanged (a reset button). */
 function refreshAll() {
-  withLock_(drawAll_);
+  withLock_(() => drawAll_(true));
 }
 
 /**
@@ -21,20 +21,20 @@ function refreshAll() {
 function onEdit(e) {
   if (!e || !e.range) return;
   const tab = e.range.getSheet().getName();
-  if ([TABS.catalog, TABS.plan, TABS.steps].includes(tab)) withLock_(drawAll_);
+  if ([TABS.catalog, TABS.plan, TABS.steps].includes(tab)) withLock_(() => drawAll_(false));
 }
 
 /**
  * Read the input tabs once, add Steps headings for newly checked items, draw every drawn tab from that one read,
- * then report all problems together. Creates the Steps tab the first time (moving over steps from the first
- * Breakdowns layout).
+ * then report all problems together. Tabs whose content wouldn't change are skipped unless `force`. Creates the
+ * Steps tab the first time (moving over steps from the first Breakdowns layout).
  */
-function drawAll_() {
+function drawAll_(force) {
   ensureStepsTab_();
   const schedule = readSchedule_();
   addMissingStepHeadings_(schedule);
-  drawBreakdowns_(schedule);
-  const gridProblems = [...drawWeekdays_(schedule), ...drawWeekends_(schedule)];
+  drawBreakdowns_(schedule, force);
+  const gridProblems = [...drawWeekdays_(schedule, force), ...drawWeekends_(schedule, force)];
   reportProblems_([...schedule.problems, ...gridProblems]);
 }
 
