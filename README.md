@@ -33,6 +33,7 @@ any other directly, and names must be unique across all files.
 | `Steps.js` | The Steps tab: reading grouped steps, adding headings for newly checked items, the one-time move from the first Breakdowns layout |
 | `Breakdowns.js` | The Breakdowns tab (view only): one group per checked item, the clock-time views |
 | `Grid.js` | The week grids (Weekdays, Weekends): placing Week Plan rows into 30-minute chunks, overlap checks, label boxes |
+| `Rename.js` | Carrying a Catalog rename to the Week Plan and Steps |
 | `Triggers.js` | Entry points: the 🗓️ Schedule menu, `onEdit` auto-redraw, the document lock |
 | `Drawing.js` | Helpers every drawn tab uses: clearing a sheet, the batched row painter, fingerprints for skipping unchanged tabs, reporting data problems |
 
@@ -44,6 +45,12 @@ last drew (in the document's properties) and is skipped when the new page matche
 are only set when a tab's shape changes. **🗓️ Schedule → 🔄 Refresh everything** redraws every tab from scratch.
 The first refresh after this version creates the Steps tab and moves over any steps typed on the old Breakdowns
 layout, including ones parked in its hidden holding area.
+
+### Renaming an item
+
+Change a name in the Catalog's Item column and it's carried to every Week Plan row and Steps heading that used it
+(Week Plan labels are left alone). It only happens for a one-cell edit, and not when it would merge two items:
+the new name already belongs to another Catalog row, or another row still uses the old one.
 
 ### Problems
 
@@ -78,6 +85,7 @@ computer. `test/fixtures/schedule.json` is a copy of the real data tabs.
 - `test/redraw.js`: edits only redraw what they change, sizes are only set when needed, a repaint matches drawing
   from scratch, and Refresh everything always redraws.
 - `test/problems.js`: problems land in each tab's ⚠ Check column and clear when fixed; Check data lists them all.
+- `test/rename.js`: a Catalog rename reaches the Week Plan and Steps, but never merges two items.
 
 ## Workflow
 

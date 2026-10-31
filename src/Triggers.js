@@ -25,13 +25,18 @@ function refreshAll() {
 }
 
 /**
- * Simple trigger: an edit on any input tab (Catalog, Week Plan, Steps) redraws the drawn tabs. Edits on the drawn
- * tabs themselves, or on Categories (nothing drawn uses it yet), do nothing.
+ * Simple trigger: an edit on any input tab (Catalog, Week Plan, Steps) redraws the drawn tabs. Renaming an item on
+ * the Catalog first carries the new name to the Week Plan and Steps. Edits on the drawn tabs themselves, or on
+ * Categories (nothing drawn uses it yet), do nothing.
  */
 function onEdit(e) {
   if (!e || !e.range) return;
   const tab = e.range.getSheet().getName();
-  if ([TABS.catalog, TABS.plan, TABS.steps].includes(tab)) withLock_(() => drawAll_(false));
+  if (![TABS.catalog, TABS.plan, TABS.steps].includes(tab)) return;
+  withLock_(() => {
+    if (tab === TABS.catalog) carryRename_(e);
+    drawAll_(false);
+  });
 }
 
 /**
