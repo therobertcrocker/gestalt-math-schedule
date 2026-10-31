@@ -8,15 +8,18 @@
 
 // ---------------------------------------------------------------- entry points
 
-/** Read the steps on the tab, then redraw it from the Catalog, the Week Plan and those steps. */
-function drawBreakdowns_() {
+/**
+ * Read the steps on the tab, then redraw it from the Catalog, the Week Plan and those steps. Pass `given` (from
+ * readSchedule_) when drawing several tabs at once; the caller then reports problems.
+ */
+function drawBreakdowns_(given) {
   const ss = SpreadsheetApp.getActive();
-  const schedule = readSchedule_();
+  const schedule = given || readSchedule_();
   const sh = ss.getSheetByName(TABS.breakdowns) || ss.insertSheet(TABS.breakdowns);
   const saved = readBreakdownSteps_(sh);
   const groups = breakdownGroups_(schedule, saved);
   paintPage_(sh, layoutBreakdowns_(groups));
-  reportProblems_(schedule.problems);
+  if (!given) reportProblems_(schedule.problems);
 }
 
 /**
@@ -215,12 +218,12 @@ function layoutGroup_(g, add) {
 }
 
 /**
- * The cells of one view: a title (slot and how full it is) and one body row per 5 minutes, each a Map of
+ * The cells of one view: a title (slot and how full it is) and one body row per `viewMinutes` (default 5), each a Map of
  * column offset within the view → cell. Rows past the end of the slot are flagged; unused rows in the slot are grey.
  */
 function viewCells_(g, slot, total) {
   const v = BREAKDOWNS.view;
-  const step = BREAKDOWNS.minutesPerRow;
+  const step = g.item.viewMinutes || BREAKDOWNS.minutesPerRow;
   const relative = slot.start === null;
   const length = relative ? total : slot.end - slot.start;
   const clock = offset => (relative ? relativeTime_(offset) : formatTime_(slot.start + offset));
@@ -250,7 +253,7 @@ function viewCells_(g, slot, total) {
     const row = new Map([[v.barLeft, { value: '', bg: bar }], [v.barRight, { value: '', bg: bar }]]);
     const begins = starts.filter(s => s.at >= offset && s.at < offset + step);
     const freeStarts = !used && !over && length > total && offset === Math.ceil(total / step) * step;
-    // Steps starting inside the same 5 minutes share one label ("Meds · Shower"); free time joins it too
+    // Steps starting inside the same row share one label ("Meds · Shower"); free time joins it too
     const parts = begins.map(s => (s.step.min > 0 ? s.step.step : BREAKDOWNS.marker + s.step.step));
     if (freeStarts) parts.push(`free · ${length - total} min`);
     if (parts.length) {
@@ -295,32 +298,6 @@ function paintPage_(sh, page) {
   sh.hideColumns(c.key);
   sh.setFrozenRows(BREAKDOWNS.firstRow - 1);
   if (page.rows.length >= page.hiddenFrom) sh.hideRows(page.hiddenFrom, page.rows.length - page.hiddenFrom + 1);
-}
-
-/**
- * Write laid-out rows (each a Map of column → cell) starting at `firstRow`, nCols wide, in a handful of batched
- * calls: values and formats as whole grids, then all comment lines and font sizes as one range list each.
- */
-function paintRows_(sh, firstRow, rows, nCols) {
-  if (!rows.length) return;
-  const grid = fn => rows.map(row => Array.from({ length: nCols }, (_, j) => fn(row.get(j + 1))));
-  const range = sh.getRange(firstRow, 1, rows.length, nCols);
-  range.setValues(grid(cell => (cell && cell.value !== undefined ? cell.value : '')));
-  range.setBackgrounds(grid(cell => (cell && cell.bg) || COLOR.white));
-  range.setFontColors(grid(cell => (cell && cell.color) || COLOR.text));
-  range.setFontWeights(grid(cell => (cell && cell.bold ? 'bold' : 'normal')));
-  range.setHorizontalAlignments(grid(cell => (cell && cell.halign) || 'left'));
-  range.setVerticalAlignment('middle');
-
-  const lines = [];
-  const sized = new Map();
-  rows.forEach((row, i) => row.forEach((cell, col) => {
-    const a1 = sh.getRange(firstRow + i, col).getA1Notation();
-    if (cell.line) lines.push(a1);
-    if (cell.size) sized.set(a1, cell.size);
-  }));
-  if (lines.length) sh.getRangeList(lines).setBorder(null, null, true, null, null, null, COLOR.line, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
-  sized.forEach((size, a1) => sh.getRange(a1).setFontSize(size));
 }
 
 // ---------------------------------------------------------------- small helpers

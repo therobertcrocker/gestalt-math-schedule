@@ -23,7 +23,11 @@ const TABS = Object.freeze({
   catalog: 'Catalog',
   plan: 'Week Plan',
   breakdowns: 'Breakdowns',
+  weekdays: 'Weekdays',
 });
+
+/** Full day names for grid headers. */
+const DAY_NAMES = Object.freeze({ Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' });
 
 // ---------------------------------------------------------------- days and grids
 
@@ -51,10 +55,13 @@ const CATEGORIES = Object.freeze({
   col: Object.freeze({ name: 1, min: 2, max: 3, notes: 4 }),
 });
 
-/** Catalog: one row per item. Color is a "#RRGGBB" string; Breakdown is a checkbox. */
+/**
+ * Catalog: one row per item. Color is a "#RRGGBB" string; Breakdown is a checkbox; View min is how many minutes
+ * each row of the item's Breakdowns view covers (blank = BREAKDOWNS.minutesPerRow).
+ */
 const CATALOG = Object.freeze({
   firstRow: 2,
-  col: Object.freeze({ item: 1, side: 2, category: 3, color: 4, description: 5, breakdown: 6 }),
+  col: Object.freeze({ item: 1, side: 2, category: 3, color: 4, description: 5, breakdown: 6, viewMinutes: 7 }),
 });
 
 /** Week Plan: one row per placement. Days like "Mon-Fri" or "Tue, Thu"; Start/End are times of day. */
@@ -73,7 +80,7 @@ const PLAN = Object.freeze({
 const BREAKDOWNS = Object.freeze({
   firstRow: 4,                            // first group row of a drawn tab
   readFrom: 2,                            // where reading steps starts: also picks up older hand-built layouts
-  minutesPerRow: 5,                       // each view row is 5 minutes
+  minutesPerRow: 5,                       // default minutes per view row (Catalog "View min" overrides per item)
   marker: '◆ ',                           // prefix for a step with no minutes (a moment, not a span)
   titleMark: '§',                         // key-column prefix on a group's title row
   hiddenMark: '§§',                       // key-column value on the row that starts the hidden holding area
@@ -82,6 +89,37 @@ const BREAKDOWNS = Object.freeze({
   view: Object.freeze({ time: 0, barLeft: 1, label: 2, barRight: 3, width: 5 }),
   widths: Object.freeze({ key: 20, step: 220, min: 50, gap: 24, time: 70, bar: 14, label: 190 }),
 });
+
+// ---------------------------------------------------------------- grid layout (Weekdays / Weekends)
+
+/**
+ * The week grids, matching the original hand-built Schedule Planning tab:
+ *  - Rows: header (21px), divider (5px), Schedule/Activities sub-headers (21px), divider, then one 21px row per
+ *    30-minute chunk, each followed by a 5px divider row, from 6:00 AM to midnight. Hour labels in column A span
+ *    an hour's chunk, divider and chunk.
+ *  - Columns: hour labels (A), a 5px gutter (B), then 10 columns per day:
+ *    bar · label · bar · gap  (Schedule)   bar · label · bar · gap  (Activities)   dark separator · gap
+ */
+const LAYOUT = Object.freeze({
+  headerRow: 1,
+  subHeaderRow: 3,
+  firstChunkRow: 5,
+  hourCol: 1,
+  firstDayCol: 3,
+  dayWidth: 10,
+  side: Object.freeze({
+    Schedule: Object.freeze({ barLeft: 0, label: 1, barRight: 2 }),
+    Activities: Object.freeze({ barLeft: 4, label: 5, barRight: 6 }),
+  }),
+  separator: 8,                                 // offset of the dark column inside a day
+  widths: Object.freeze([25, 100, 25, 5, 25, 100, 25, 5, 5, 5]),   // one day's 10 columns
+  hourWidth: 100,
+  gutterWidth: 5,
+  heights: Object.freeze({ chunk: 21, line: 5 }),
+});
+
+/** Days drawn on the Weekdays tab, left to right. */
+const WEEKDAY_COLUMNS = Object.freeze(['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => Object.freeze({ day, grid: 'Weekday', title: DAY_NAMES[day] })));
 
 // ---------------------------------------------------------------- look (plain for now; styling comes later)
 
@@ -94,4 +132,5 @@ const COLOR = Object.freeze({
   overText: '#CC0000',
   line: '#999999',           // the comment line under each step label
   white: '#FFFFFF',
+  separator: '#434343',      // dark column between days on the grids
 });

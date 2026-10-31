@@ -1,0 +1,126 @@
+// The week grids: Weekdays now, Weekends later. Each day is drawn from the Week Plan in the layout of the original
+// hand-built Schedule Planning tab: Schedule and Activities side by side, 30-minute chunks separated by thin
+// divider rows, colored bars on both sides of each item, and the item's label with a comment line at its start.
+//
+// The tab is redrawn from scratch every time; nothing on it is typed by hand.
+
+// ---------------------------------------------------------------- entry points
+
+/** Draw the Weekdays tab. Returns any overlap problems found, for the caller to report. */
+function drawWeekdays_(schedule) {
+  return drawGrid_(TABS.weekdays, WEEKDAY_COLUMNS, schedule);
+}
+
+/**
+ * Draw one grid tab with the given day columns ([{ day, grid, title }]) from the schedule.
+ * Returns problems for items on the same side of the same day that overlap.
+ */
+function drawGrid_(tabName, columns, schedule) {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(tabName) || ss.insertSheet(tabName);
+  const placed = placeItems_(columns, schedule);
+  const page = layoutGrid_(columns, placed.blocks);
+
+  clearSheet_(sh);
+  ensureSheetSize_(sh, page.rows.length, page.nCols);
+  paintRows_(sh, 1, page.rows, page.nCols);
+  page.merges.forEach(([row, col, nRows, nCols]) => sh.getRange(row, col, nRows, nCols).merge());
+
+  // Sizes: alternating chunk/divider rows, and the fixed column pattern
+  page.rows.forEach((_, i) => sh.setRowHeight(i + 1, (i % 2 === 0) ? LAYOUT.heights.chunk : LAYOUT.heights.line));
+  sh.setColumnWidth(LAYOUT.hourCol, LAYOUT.hourWidth);
+  sh.setColumnWidth(LAYOUT.hourCol + 1, LAYOUT.gutterWidth);
+  columns.forEach((_, d) => LAYOUT.widths.forEach((px, offset) => sh.setColumnWidth(dayColumn_(d, offset), px)));
+  sh.setFrozenRows(LAYOUT.subHeaderRow + 1);
+  sh.setFrozenColumns(LAYOUT.hourCol + 1);
+  return placed.problems;
+}
+
+// ---------------------------------------------------------------- placing items
+
+/**
+ * Turn Week Plan rows into blocks to draw: [{ col (day index), side, first, last, label, color, row }], where
+ * first/last are chunk indexes (0 = 6:00 AM) and last is inclusive. Times are rounded to the nearest chunk.
+ * Blocks that overlap another on the same side of the same day are drawn anyway and reported.
+ */
+function placeItems_(columns, schedule) {
+  const chunks = (TIME.dayEnd - TIME.dayStart) / TIME.chunk;
+  const blocks = [];
+  const problems = [];
+  schedule.plan.forEach(p => {
+    const item = schedule.catalog.get(p.item);
+    const first = Math.max(0, Math.round((p.start - TIME.dayStart) / TIME.chunk));
+    const end = Math.min(chunks, Math.round((p.end - TIME.dayStart) / TIME.chunk));
+    columns.forEach((c, col) => {
+      if (c.grid !== p.grid || !p.days.includes(c.day)) return;
+      if (end <= first) {
+        problems.push({ tab: TABS.plan, row: p.row, message: `${p.item}: outside the grid's ${formatTime_(TIME.dayStart)} – midnight` });
+        return;
+      }
+      blocks.push({ col, side: item.side, first, last: end - 1, label: p.label, color: item.color, row: p.row, item: p.item, day: c.day });
+    });
+  });
+
+  // Overlaps: same day, same side, sharing at least one chunk
+  blocks.forEach((b, i) => blocks.slice(0, i).forEach(a => {
+    if (a.col === b.col && a.side === b.side && a.first <= b.last && b.first <= a.last) {
+      problems.push({ tab: TABS.plan, row: b.row, message: `${b.label} overlaps ${a.label} on ${b.day} (${b.side})` });
+    }
+  }));
+  return { blocks, problems };
+}
+
+// ---------------------------------------------------------------- layout
+
+/** Build the page: rows (Maps of column → cell), merges ([row, col, nRows, nCols]) and the width in columns. */
+function layoutGrid_(columns, blocks) {
+  const chunks = (TIME.dayEnd - TIME.dayStart) / TIME.chunk;
+  const nRows = LAYOUT.firstChunkRow - 1 + chunks * 2 + 4;          // headers, chunks + dividers, the midnight label
+  const nCols = dayColumn_(columns.length - 1, LAYOUT.dayWidth - 1);
+  const rows = Array.from({ length: nRows }, () => new Map());
+  const merges = [];
+  const set = (row, col, cell) => rows[row - 1].set(col, Object.assign({}, rows[row - 1].get(col), cell));
+
+  // Headers
+  columns.forEach((c, d) => {
+    const s = LAYOUT.side;
+    set(LAYOUT.headerRow, dayColumn_(d, 0), { value: c.title, bold: true, size: 14, halign: 'center' });
+    merges.push([LAYOUT.headerRow, dayColumn_(d, 0), 1, s.Activities.barRight + 1]);
+    Object.entries(s).forEach(([name, cols]) => {
+      set(LAYOUT.subHeaderRow, dayColumn_(d, cols.barLeft), { value: name, bold: true, halign: 'center', line: true });
+      merges.push([LAYOUT.subHeaderRow, dayColumn_(d, cols.barLeft), 1, 3]);
+    });
+    for (let r = 1; r <= nRows; r++) set(r, dayColumn_(d, LAYOUT.separator), { bg: COLOR.separator });
+  });
+
+  // Hour labels down the left, each spanning chunk · divider · chunk; the last one marks midnight
+  for (let minutes = TIME.dayStart, row = LAYOUT.firstChunkRow; minutes <= TIME.dayEnd; minutes += 60, row += 4) {
+    set(row, LAYOUT.hourCol, { value: formatTime_(minutes), bold: true, halign: 'center' });
+    merges.push([row, LAYOUT.hourCol, 3, 1]);
+  }
+
+  // Items: bars on both sides from the first chunk through the last (including the dividers between),
+  // and the label with its comment line on the first chunk
+  blocks.forEach(b => {
+    const cols = LAYOUT.side[b.side];
+    const top = chunkRow_(b.first);
+    const bottom = chunkRow_(b.last);
+    for (let r = top; r <= bottom; r++) {
+      set(r, dayColumn_(b.col, cols.barLeft), { bg: b.color });
+      set(r, dayColumn_(b.col, cols.barRight), { bg: b.color });
+    }
+    set(top, dayColumn_(b.col, cols.label), { value: b.label, halign: 'center', line: true });
+  });
+
+  return { rows, merges, nCols };
+}
+
+/** Sheet column of a cell inside the d-th day (0-based), counted from the day's first column. */
+function dayColumn_(d, offset) {
+  return LAYOUT.firstDayCol + d * LAYOUT.dayWidth + offset;
+}
+
+/** Sheet row of a 30-minute chunk (0 = 6:00 AM). */
+function chunkRow_(chunk) {
+  return LAYOUT.firstChunkRow + chunk * 2;
+}

@@ -9,7 +9,7 @@
 /**
  * Read every data tab. Returns { categories, catalog, plan, problems }:
  *  - categories: [{ name, min, max, notes }]           (min/max are hours per week, or null)
- *  - catalog:    Map item name → { name, side, category, color, description, breakdown }
+ *  - catalog:    Map item name → { name, side, category, color, description, breakdown, viewMinutes }
  *  - plan:       [{ row, item, label, days, start, end, grid, notes }]   (start/end in minutes)
  *  - problems:   [{ tab, row, message }]
  */
@@ -48,7 +48,7 @@ function readCatalog_(categories, problems) {
   const c = CATALOG.col;
   const known = new Set(categories.map(cat => cat.name));
   const catalog = new Map();
-  readRows_(TABS.catalog, CATALOG.firstRow, 6).forEach(r => {
+  readRows_(TABS.catalog, CATALOG.firstRow, 7).forEach(r => {
     const v = r.values;
     const name = text_(v[c.item - 1]);
     if (!name) return;
@@ -62,7 +62,14 @@ function readCatalog_(categories, problems) {
       color: text_(v[c.color - 1]).toUpperCase(),
       description: text_(v[c.description - 1]),
       breakdown: v[c.breakdown - 1] === true,
+      viewMinutes: BREAKDOWNS.minutesPerRow,
     };
+    const viewMinutes = v[c.viewMinutes - 1];
+    if (viewMinutes !== '' && viewMinutes !== null && viewMinutes !== undefined) {
+      const n = Number(viewMinutes);
+      if (Number.isInteger(n) && n >= 1 && n <= 30) item.viewMinutes = n;
+      else report('View min should be a whole number from 1 to 30');
+    }
     if (!SIDES.includes(item.side)) report(`Side should be ${SIDES.join(' or ')}`);
     if (item.category && !known.has(item.category)) report(`category "${item.category}" isn't on Categories`);
     if (!/^#[0-9A-F]{6}$/.test(item.color)) report('Color should look like #9FC5E8');

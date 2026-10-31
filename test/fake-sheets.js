@@ -107,6 +107,7 @@ class FakeSheet {
   hideRows(r, n = 1) { for (let i = 0; i < n; i++) this.hiddenRows.add(r + i); }
   showRows(r, n = 1) { for (let i = 0; i < n; i++) this.hiddenRows.delete(r + i); }
   setFrozenRows(n) { this.frozenRows = n; }
+  setFrozenColumns(n) { this.frozenCols = n; }
   setHiddenGridlines(b) { this.gridlinesHidden = b; }
   setTabColor(c) { this.tabColor = c; }
   hideSheet() { this.hidden = true; }

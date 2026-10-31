@@ -3,26 +3,12 @@
 'use strict';
 
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
-const { makeEnvironment } = require('./fake-sheets');
+const helpers = require('./helpers');
 
-const FIXTURE = require('./fixtures/schedule.json');
-const SRC = path.join(__dirname, '..', 'src');
+const FIXTURE = helpers.fixture();
 
-/** A fresh fake spreadsheet holding the given tabs, with the script loaded into the same global scope. */
-function setUp(tabs) {
-  const env = makeEnvironment(new Date(2026, 9, 31, 12, 0));
-  Object.entries(tabs).forEach(([name, rows]) => {
-    const sh = env.book.insertSheet(name);
-    sh.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
-  });
-  const ctx = vm.createContext({ ...env.globals });
-  fs.readdirSync(SRC).filter((f) => f.endsWith('.js')).sort()
-    .forEach((f) => vm.runInContext(fs.readFileSync(path.join(SRC, f), 'utf8'), ctx, { filename: f }));
-  return ctx;
-}
+/** The script loaded into a fake spreadsheet holding `tabs` (the real data unless given). */
+const setUp = (tabs) => helpers.setUp(tabs).app;
 
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
@@ -106,11 +92,16 @@ test('broken rows are reported, not fatal', () => {
   assert.strictEqual(plan.length, 15);   // the 14 real rows plus the off-the-half-hour one
 });
 
+test('View min on the Catalog: blank means 5, bad values are reported', () => {
+  const tabs = JSON.parse(JSON.stringify(FIXTURE));
+  tabs.Catalog[2][6] = 0;                                              // Block: out of range
+  const { catalog, problems } = setUp(tabs).readSchedule_();
+  assert.strictEqual(catalog.get('Wake-Up').viewMinutes, 1);
+  assert.strictEqual(catalog.get('Daily Prep').viewMinutes, 5);
+  assert.strictEqual(catalog.get('Block').viewMinutes, 5);
+  assert.deepStrictEqual([...problems].map((p) => p.message), ['Block: View min should be a whole number from 1 to 30']);
+});
+
 // ---------------------------------------------------------------- run
 
-let failed = 0;
-tests.forEach(([name, fn]) => {
-  try { fn(); console.log(`✓ ${name}`); } catch (err) { failed++; console.log(`✗ ${name}\n  ${err.message.split('\n').join('\n  ')}`); }
-});
-console.log(failed ? `\n${failed} of ${tests.length} failed` : `\nAll ${tests.length} passed`);
-process.exitCode = failed ? 1 : 0;
+helpers.run(tests);

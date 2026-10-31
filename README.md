@@ -12,10 +12,11 @@ You only type into the data tabs. Everything else is drawn from them.
 | Tab | You edit it? | What it holds |
 |---|---|---|
 | Categories | yes | Category names, with optional Min/Max hours per week |
-| Catalog | yes | Every item: which side of the grid (Schedule / Activities), category, color, description, Breakdown checkbox |
+| Catalog | yes | Every item: which side of the grid (Schedule / Activities), category, color, description, Breakdown checkbox, View min (minutes per Breakdowns view row; blank = 5) |
 | Week Plan | yes | When each item happens: item, optional label, days (`Mon-Fri`, `Tue, Thu`), start, end, which grid |
-| Breakdowns | steps only | One group per checked item, by start time. You type Step and Min; the 5-minute view beside it is drawn |
-| Weekdays / Weekends | no | The grids, drawn in 30-minute chunks *(coming)* |
+| Breakdowns | steps only | One group per checked item, by start time. You type Step and Min; the clock-time view beside it is drawn. A step with no minutes is a ◆ marker |
+| Weekdays | no | Mon–Fri, drawn from the Week Plan in the original grid's layout (30-minute chunks, 10 columns per day) |
+| Weekends | no | Home and Travel weekends *(coming)* |
 | Stats | no | Hours per category against targets *(coming)* |
 
 ## Where things are
@@ -27,13 +28,15 @@ any other directly, and names must be unique across all files.
 |---|---|
 | `Config.js` | Every setting: tab names, column layouts, days, grids, the time range |
 | `Data.js` | Reading the data tabs into plain objects, and reporting rows that can't be used |
-| `Breakdowns.js` | The Breakdowns tab: reading typed steps, grouping by checked item, the 5-minute clock-time views |
+| `Breakdowns.js` | The Breakdowns tab: reading typed steps, grouping by checked item, the clock-time views, single-group repaints |
+| `Grid.js` | The week grids: placing Week Plan rows into 30-minute chunks, overlap checks, the grid layout |
 | `Triggers.js` | Entry points: the 🗓️ Schedule menu, `onEdit` auto-redraw, the document lock |
-| `Drawing.js` | Small helpers every drawn tab uses (clearing a sheet, growing it, reporting data problems) |
+| `Drawing.js` | Helpers every drawn tab uses: clearing a sheet, the batched row painter, reporting data problems |
 
 ### How Breakdowns keeps your steps
 
-The tab is redrawn from scratch on every change, after first reading the steps already on it. A hidden key
+A full redraw starts from a blank tab, after first reading the steps already on it. Typing a step only repaints
+that group, as long as it stays the same height. A hidden key
 column (A) records which item each row belongs to; title rows are marked `§Item`. A row you insert without a key
 joins the group above it. Unchecked items move below a hidden `§§` marker row with their steps, and come back
 when re-checked.
@@ -58,7 +61,9 @@ computer. `test/fixtures/schedule.json` is a copy of the real data tabs.
 
 - `test/data.js`: the data reads cleanly, and broken rows are reported instead of crashing.
 - `test/breakdowns.js`: typed steps survive every redraw, views follow the Week Plan, overflow is flagged,
-  unchecking/rechecking keeps steps, and redrawing an unchanged tab changes nothing.
+  markers and per-item row sizes, unchecking/rechecking keeps steps, a single-group repaint matches a full redraw.
+- `test/grid.js`: every label lands in the same cell as on the hand-built Schedule Planning tab, with the same
+  bars, row heights and column widths; overlaps are reported.
 
 ## Workflow
 

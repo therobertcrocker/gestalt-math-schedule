@@ -143,6 +143,19 @@ test('steps past the end of the slot are flagged', () => {
   assert.strictEqual(cells[`F${title + 1 + 6}`].fmt.bg, '#F9CB9C', 'the 6th view row is still inside it');
 });
 
+test('an item with View min 1 gets one row per minute, so short steps each get their own label', () => {
+  const tabs = [['Item', 'Step', 'Min'], ['Wake-Up'], ['', 'Brush teeth', 2], ['', 'Floss', 1], ['', 'Wash face', 3]];
+  const { sh } = drawn(tabs);
+  const r = rows(sh);
+  const title = r.findIndex((row) => row[0] === '§Wake-Up');
+  const body = r.slice(title + 1).filter((row) => row[0] === 'Wake-Up');
+  assert.strictEqual(body.length, 30, '30 one-minute rows for a 30-minute slot');
+  assert.deepStrictEqual([body[0][4], body[0][6]], ['6:30 AM', 'Brush teeth']);
+  assert.deepStrictEqual([body[2][4], body[2][6]], ['6:32 AM', 'Floss']);
+  assert.deepStrictEqual([body[3][4], body[3][6]], ['6:33 AM', 'Wash face']);
+  assert.deepStrictEqual([body[6][4], body[6][6]], ['6:36 AM', 'free · 24 min']);
+});
+
 test('a row inserted without a key joins the group above it', () => {
   const { app, sh } = drawn();
   const b = findRow(sh, 'Daily Prep', 'B');

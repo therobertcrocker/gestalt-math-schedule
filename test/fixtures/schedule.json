@@ -1,40 +1,275 @@
 {
   "Categories": [
-    ["Category", "Min hrs/wk", "Max hrs/wk", "Notes"],
-    ["Work", "", "", "Focus blocks count here"],
-    ["Dance", "", "", "Teaching, practice, privates"],
-    ["Health & Self-Care", "", "", ""],
-    ["Partner Time", "", "", ""],
-    ["Hobbies", "", "", "TTRPGs, projects"],
-    ["House Projects", "", "", ""]
+    [
+      "Category",
+      "Min hrs/wk",
+      "Max hrs/wk",
+      "Notes"
+    ],
+    [
+      "Work",
+      "",
+      "",
+      "Focus blocks count here"
+    ],
+    [
+      "Dance",
+      "",
+      "",
+      "Teaching, practice, privates"
+    ],
+    [
+      "Health & Self-Care",
+      "",
+      "",
+      ""
+    ],
+    [
+      "Partner Time",
+      "",
+      "",
+      ""
+    ],
+    [
+      "Hobbies",
+      "",
+      "",
+      "TTRPGs, projects"
+    ],
+    [
+      "House Projects",
+      "",
+      "",
+      ""
+    ]
   ],
   "Catalog": [
-    ["Item", "Side", "Category", "Color", "Description", "Breakdown"],
-    ["Wake-Up", "Schedule", "Health & Self-Care", "#FFF2CC", "Start of the day", true],
-    ["Block", "Schedule", "Work", "#9FC5E8", "Dedicated focus time. Work by default; flexible on off days.", false],
-    ["Privates Block", "Schedule", "Dance", "#D9EAD3", "Window when privates can be booked", false],
-    ["Daily Prep", "Activities", "Health & Self-Care", "#F9CB9C", "", true],
-    ["Coffee Walk", "Activities", "Health & Self-Care", "#F9CB9C", "", false],
-    ["Lunch", "Activities", "", "#F9CB9C", "Shown on the grid, not counted in Stats", false],
-    ["EMDR", "Activities", "Health & Self-Care", "#EA9999", "", false],
-    ["Reverie", "Activities", "Dance", "#B6D7A8", "Teaching", false],
-    ["D&D", "Activities", "Hobbies", "#B4A7D6", "", false]
+    [
+      "Item",
+      "Side",
+      "Category",
+      "Color",
+      "Description",
+      "Breakdown",
+      "View min"
+    ],
+    [
+      "Wake-Up",
+      "Schedule",
+      "Health & Self-Care",
+      "#FFF2CC",
+      "Start of the day",
+      true,
+      1
+    ],
+    [
+      "Block",
+      "Schedule",
+      "Work",
+      "#9FC5E8",
+      "Dedicated focus time. Work by default; flexible on off days.",
+      false,
+      ""
+    ],
+    [
+      "Privates Block",
+      "Schedule",
+      "Dance",
+      "#D9EAD3",
+      "Window when privates can be booked",
+      false,
+      ""
+    ],
+    [
+      "Daily Prep",
+      "Activities",
+      "Health & Self-Care",
+      "#F9CB9C",
+      "",
+      true,
+      ""
+    ],
+    [
+      "Coffee Walk",
+      "Activities",
+      "Health & Self-Care",
+      "#F9CB9C",
+      "",
+      false,
+      ""
+    ],
+    [
+      "Lunch",
+      "Activities",
+      "",
+      "#F9CB9C",
+      "Shown on the grid, not counted in Stats",
+      false,
+      ""
+    ],
+    [
+      "EMDR",
+      "Activities",
+      "Health & Self-Care",
+      "#EA9999",
+      "",
+      false,
+      ""
+    ],
+    [
+      "Reverie",
+      "Activities",
+      "Dance",
+      "#B6D7A8",
+      "Teaching",
+      false,
+      ""
+    ],
+    [
+      "D&D",
+      "Activities",
+      "Hobbies",
+      "#B4A7D6",
+      "",
+      false,
+      ""
+    ]
   ],
   "Week Plan": [
-    ["Item", "Label", "Days", "Start", "End", "Grid", "Notes"],
-    ["Wake-Up", "", "Mon-Fri", "6:30 AM", "7:00 AM", "Weekday", ""],
-    ["Daily Prep", "", "Mon-Fri", "7:00 AM", "7:30 AM", "Weekday", ""],
-    ["Block", "Early Morning Block", "Mon-Fri", "7:30 AM", "9:30 AM", "Weekday", ""],
-    ["Coffee Walk", "", "Mon-Fri", "9:30 AM", "10:00 AM", "Weekday", ""],
-    ["Block", "Mid-Morning Block", "Mon-Fri", "10:00 AM", "12:00 PM", "Weekday", ""],
-    ["EMDR", "", "Wed", "11:00 AM", "12:00 PM", "Weekday", ""],
-    ["EMDR", "", "Mon", "12:00 PM", "1:00 PM", "Weekday", ""],
-    ["Lunch", "", "Tue, Thu, Fri", "12:00 PM", "1:00 PM", "Weekday", ""],
-    ["Block", "Mid Day Block", "Mon, Tue, Thu, Fri", "1:00 PM", "3:00 PM", "Weekday", ""],
-    ["Block", "Afternoon Block", "Wed", "3:00 PM", "5:00 PM", "Weekday", ""],
-    ["Privates Block", "", "Tue", "4:00 PM", "6:00 PM", "Weekday", ""],
-    ["Privates Block", "", "Thu", "6:00 PM", "8:00 PM", "Weekday", ""],
-    ["Reverie", "", "Tue", "6:00 PM", "7:00 PM", "Weekday", ""],
-    ["D&D", "", "Mon", "7:00 PM", "10:00 PM", "Weekday", ""]
+    [
+      "Item",
+      "Label",
+      "Days",
+      "Start",
+      "End",
+      "Grid",
+      "Notes"
+    ],
+    [
+      "Wake-Up",
+      "",
+      "Mon-Fri",
+      "6:30 AM",
+      "7:00 AM",
+      "Weekday",
+      ""
+    ],
+    [
+      "Daily Prep",
+      "",
+      "Mon-Fri",
+      "7:00 AM",
+      "7:30 AM",
+      "Weekday",
+      ""
+    ],
+    [
+      "Block",
+      "Early Morning Block",
+      "Mon-Fri",
+      "7:30 AM",
+      "9:30 AM",
+      "Weekday",
+      ""
+    ],
+    [
+      "Coffee Walk",
+      "",
+      "Mon-Fri",
+      "9:30 AM",
+      "10:00 AM",
+      "Weekday",
+      ""
+    ],
+    [
+      "Block",
+      "Mid-Morning Block",
+      "Mon-Fri",
+      "10:00 AM",
+      "12:00 PM",
+      "Weekday",
+      ""
+    ],
+    [
+      "EMDR",
+      "",
+      "Wed",
+      "11:00 AM",
+      "12:00 PM",
+      "Weekday",
+      ""
+    ],
+    [
+      "EMDR",
+      "",
+      "Mon",
+      "12:00 PM",
+      "1:00 PM",
+      "Weekday",
+      ""
+    ],
+    [
+      "Lunch",
+      "",
+      "Tue, Thu, Fri",
+      "12:00 PM",
+      "1:00 PM",
+      "Weekday",
+      ""
+    ],
+    [
+      "Block",
+      "Mid Day Block",
+      "Mon, Tue, Thu, Fri",
+      "1:00 PM",
+      "3:00 PM",
+      "Weekday",
+      ""
+    ],
+    [
+      "Block",
+      "Afternoon Block",
+      "Wed",
+      "3:00 PM",
+      "5:00 PM",
+      "Weekday",
+      ""
+    ],
+    [
+      "Privates Block",
+      "",
+      "Tue",
+      "4:00 PM",
+      "6:00 PM",
+      "Weekday",
+      ""
+    ],
+    [
+      "Privates Block",
+      "",
+      "Thu",
+      "6:00 PM",
+      "8:00 PM",
+      "Weekday",
+      ""
+    ],
+    [
+      "Reverie",
+      "",
+      "Tue",
+      "6:00 PM",
+      "7:00 PM",
+      "Weekday",
+      ""
+    ],
+    [
+      "D&D",
+      "",
+      "Mon",
+      "7:00 PM",
+      "10:00 PM",
+      "Weekday",
+      ""
+    ]
   ]
 }
