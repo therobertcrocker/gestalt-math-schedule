@@ -96,6 +96,7 @@ class FakeSheet {
   clear() { this.cells = new Map(); }
   clearConditionalFormatRules() { this.cfRules = []; }
   setConditionalFormatRules(rules) { this.cfRules = rules.map(plain); }
+  getConditionalFormatRules() { return this.cfRules.slice(); }
   setRowHeight(r, h) { this.rowHeights.set(r, h); }
   setRowHeights(r, n, h) { for (let i = 0; i < n; i++) this.rowHeights.set(r + i, h); }
   setColumnWidth(c, w) { this.colWidths.set(c, w); }
@@ -278,6 +279,7 @@ function makeEnvironment(startTime) {
   const DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const props = new Map();
+  const alerts = [];
   const documentProperties = {
     getProperty: (k) => (props.has(k) ? props.get(k) : null),
     setProperty: (k, v) => { props.set(k, String(v)); return documentProperties; },
@@ -290,7 +292,7 @@ function makeEnvironment(startTime) {
       getActive: () => book,
       getUi: () => ({
         createMenu: menu,
-        alert: () => 'OK',
+        alert: (...args) => { alerts.push(args.filter((a) => typeof a === 'string')); return 'OK'; },
         Button: { OK: 'OK', CANCEL: 'CANCEL' },
         ButtonSet: { OK: 'OK', OK_CANCEL: 'OK_CANCEL' },
       }),
@@ -320,7 +322,7 @@ function makeEnvironment(startTime) {
     },
     console,
   };
-  return { book, clock, globals, triggers, menus, FakeDate, pad };
+  return { book, clock, globals, triggers, menus, alerts, FakeDate, pad };
 }
 
 module.exports = { makeEnvironment, colLetter, colNumber };

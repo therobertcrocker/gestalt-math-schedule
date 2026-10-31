@@ -145,6 +145,18 @@ const WEEKEND_COLUMNS = Object.freeze([
   ...GRIDS['Weekend - Travel'].map(day => Object.freeze({ day, grid: 'Weekend - Travel', title: `${DAY_NAMES[day]} · Travel` })),
 ]);
 
+// ---------------------------------------------------------------- problems on the input tabs
+
+/**
+ * The "⚠ Check" column at the right edge of each input tab: the script writes why a row can't be used, and clears
+ * it once the row is fixed. Nothing is typed there. While a row has a problem, its column-A cell is highlighted.
+ */
+const CHECK = Object.freeze({
+  header: '⚠ Check',
+  col: Object.freeze({ Categories: 5, Catalog: 8, 'Week Plan': 8, Steps: 4 }),   // by tab name (see TABS)
+  width: 320,
+});
+
 // ---------------------------------------------------------------- look (plain for now; styling comes later)
 
 const COLOR = Object.freeze({
@@ -157,4 +169,6 @@ const COLOR = Object.freeze({
   line: '#999999',           // the comment line under each step label
   white: '#FFFFFF',
   separator: '#434343',      // dark column between days on the grids
+  problem: '#F4CCCC',        // column-A highlight on input rows with a problem
+  problemText: '#CC0000',    // the ⚠ Check column
 });

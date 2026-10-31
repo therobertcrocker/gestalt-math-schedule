@@ -45,6 +45,12 @@ are only set when a tab's shape changes. **🗓️ Schedule → 🔄 Refresh eve
 The first refresh after this version creates the Steps tab and moves over any steps typed on the old Breakdowns
 layout, including ones parked in its hidden holding area.
 
+### Problems
+
+A row that can't be used (an unknown item, End before Start, a day its grid doesn't have, overlapping items…) gets
+its reason in the **⚠ Check** column at the right edge of its tab, and its column-A cell is highlighted. The message
+clears itself once the row is fixed. **🗓️ Schedule → ⚠ Check data** lists every problem at once.
+
 ## Conventions
 
 Same as house-tasks:
@@ -71,6 +77,7 @@ computer. `test/fixtures/schedule.json` is a copy of the real data tabs.
   side by side.
 - `test/redraw.js`: edits only redraw what they change, sizes are only set when needed, a repaint matches drawing
   from scratch, and Refresh everything always redraws.
+- `test/problems.js`: problems land in each tab's ⚠ Check column and clear when fixed; Check data lists them all.
 
 ## Workflow
 

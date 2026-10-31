@@ -120,10 +120,50 @@ function a1_(row, col) {
   return letters + row;
 }
 
-/** Tell the user about data rows that couldn't be used, without stopping anything. */
+// ---------------------------------------------------------------- problems
+
+/**
+ * Show problems where they'd be fixed: each one's message in its tab's ⚠ Check column (several on one row are
+ * joined with " · "), stale messages cleared, and a short toast pointing there.
+ */
 function reportProblems_(problems) {
+  markProblems_(problems);
   if (!problems.length) return;
-  const first = problems[0];
-  const more = problems.length > 1 ? ` (and ${problems.length - 1} more)` : '';
-  SpreadsheetApp.getActive().toast(`${first.tab} row ${first.row}: ${first.message}${more}`, '🗓️ Schedule: check your data', 10);
+  const tabs = [...new Set(problems.map(p => p.tab))].join(', ');
+  const count = problems.length === 1 ? '1 row needs' : `${problems.length} rows need`;
+  SpreadsheetApp.getActive().toast(`${count} attention. See ${CHECK.header} on ${tabs}.`, '🗓️ Schedule', 8);
+}
+
+/** Write every input tab's ⚠ Check column from `problems`, touching only tabs whose messages changed. */
+function markProblems_(problems) {
+  const ss = SpreadsheetApp.getActive();
+  Object.entries(CHECK.col).forEach(([tabName, col]) => {
+    const sh = ss.getSheetByName(tabName);
+    if (!sh) return;
+    if (text_(sh.getRange(1, col).getValue()) !== CHECK.header) setUpCheckColumn_(sh, col);
+
+    const byRow = new Map();
+    problems.filter(p => p.tab === tabName).forEach(p => byRow.set(p.row, (byRow.has(p.row) ? byRow.get(p.row) + ' · ' : '') + p.message));
+    const last = Math.max(sh.getLastRow(), ...byRow.keys(), 2);
+    const range = sh.getRange(2, col, last - 1, 1);
+    const wanted = Array.from({ length: last - 1 }, (_, i) => [byRow.get(i + 2) || '']);
+    const current = range.getValues().map(r => [text_(r[0])]);
+    if (JSON.stringify(current) !== JSON.stringify(wanted)) range.setValues(wanted);
+  });
+}
+
+/** First time on a tab: the ⚠ Check header, a wide red-text column, and the column-A highlight for problem rows. */
+function setUpCheckColumn_(sh, col) {
+  ensureSheetSize_(sh, sh.getMaxRows(), col);
+  sh.getRange(1, col).setValue(CHECK.header).setFontWeight('bold').setBackground(COLOR.titleBand);
+  sh.getRange(2, col, sh.getMaxRows() - 1, 1).setFontColor(COLOR.problemText).setWrap(true);
+  sh.setColumnWidth(col, CHECK.width);
+  const letter = a1_(1, col).replace(/\d+/, '');
+  const rules = sh.getConditionalFormatRules();
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(`=$${letter}2<>""`)
+    .setBackground(COLOR.problem)
+    .setRanges([sh.getRange(2, 1, sh.getMaxRows() - 1, 1)])
+    .build());
+  sh.setConditionalFormatRules(rules);
 }

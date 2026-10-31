@@ -6,7 +6,17 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('🗓️ Schedule')
     .addItem('🔄 Refresh everything', 'refreshAll')
+    .addItem('⚠ Check data', 'checkData')
     .addToUi();
+}
+
+/** Menu: list every problem on the input tabs in one dialog (they're also in each tab's ⚠ Check column). */
+function checkData() {
+  const problems = withLock_(() => drawAll_(false));
+  const ui = SpreadsheetApp.getUi();
+  if (!problems.length) return ui.alert('🗓️ Schedule', 'No problems found ✓', ui.ButtonSet.OK);
+  const lines = problems.map(p => `${p.tab}, row ${p.row}: ${p.message}`);
+  ui.alert('🗓️ Schedule: check your data', lines.join('\n'), ui.ButtonSet.OK);
 }
 
 /** Menu: redraw every drawn tab from scratch, even ones that look unchanged (a reset button). */
@@ -26,7 +36,7 @@ function onEdit(e) {
 
 /**
  * Read the input tabs once, add Steps headings for newly checked items, draw every drawn tab from that one read,
- * then report all problems together. Tabs whose content wouldn't change are skipped unless `force`. Creates the
+ * then mark all problems together (and return them). Tabs whose content wouldn't change are skipped unless `force`. Creates the
  * Steps tab the first time (moving over steps from the first Breakdowns layout).
  */
 function drawAll_(force) {
@@ -35,7 +45,9 @@ function drawAll_(force) {
   addMissingStepHeadings_(schedule);
   drawBreakdowns_(schedule, force);
   const gridProblems = [...drawWeekdays_(schedule, force), ...drawWeekends_(schedule, force)];
-  reportProblems_([...schedule.problems, ...gridProblems]);
+  const problems = [...schedule.problems, ...gridProblems];
+  reportProblems_(problems);
+  return problems;
 }
 
 /** Run fn while holding the document lock, so two redraws never overlap. */
