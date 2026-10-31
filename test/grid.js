@@ -156,10 +156,11 @@ test('Weekends: home Sat–Sun then travel Fri–Sun, side by side', () => {
   assert.deepStrictEqual(dump.size, [80, 55]);
 });
 
-test('Weekends: a wide dark band between Home and Travel', () => {
+test('Weekends: thin line, big gap, thin line between Home and Travel', () => {
   const { dump } = weekends();
-  // Sunday · Home ends at column V (22); then W white 10px, X dark 20px, Y white 10px; Travel starts at Z
-  assert.deepStrictEqual([23, 24, 25].map((col) => dump.colWidths[col]), [10, 20, 10]);
+  // Sunday · Home ends with its own thin line (U) and gap (V); then W white 40px, X dark 5px, Y white 5px; Travel at Z
+  assert.strictEqual(dump.cells.U40.fmt.bg, '#434343', "Sunday · Home's own thin line stays");
+  assert.deepStrictEqual([23, 24, 25].map((col) => dump.colWidths[col]), [40, 5, 5]);
   assert.strictEqual(dump.cells.X40.fmt.bg, '#434343');
   assert.strictEqual(dump.cells.W40.fmt.bg, '#FFFFFF');
   assert.strictEqual(dump.cells.Y40.fmt.bg, '#FFFFFF');

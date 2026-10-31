@@ -105,7 +105,7 @@ function layoutGrid_(columns, blocks) {
     for (let r = 1; r <= nRows; r++) set(r, dayColumn_(columns, d, LAYOUT.separator), { bg: COLOR.separator });
   });
 
-  // Section breaks: a wide dark band, white on either side
+  // Section breaks: a big white gap, then a thin dark line (see LAYOUT.sectionBreak)
   breaks.forEach(start => LAYOUT.sectionBreak.forEach((part, offset) => {
     if (part.dark) for (let r = 1; r <= nRows; r++) set(r, start + offset, { bg: COLOR.separator });
   }));

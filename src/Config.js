@@ -113,8 +113,9 @@ const LAYOUT = Object.freeze({
     Activities: Object.freeze({ barLeft: 4, label: 5, barRight: 6 }),
   }),
   separator: 8,                                 // offset of the dark column inside a day
-  // Between sections (Home → Travel on Weekends): white gap, wide dark band, white gap
-  sectionBreak: Object.freeze([Object.freeze({ width: 10 }), Object.freeze({ width: 20, dark: true }), Object.freeze({ width: 10 })]),
+  // Between sections (Home → Travel on Weekends), after the last day's own thin separator: a big white gap,
+  // then a second thin dark line and its gap, so the sections read as separate panels
+  sectionBreak: Object.freeze([Object.freeze({ width: 40 }), Object.freeze({ width: 5, dark: true }), Object.freeze({ width: 5 })]),
   widths: Object.freeze([25, 100, 25, 5, 25, 100, 25, 5, 5, 5]),   // one day's 10 columns
   hourWidth: 100,
   gutterWidth: 5,
