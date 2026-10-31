@@ -102,6 +102,36 @@ test('View min on the Catalog: blank means 5, bad values are reported', () => {
   assert.deepStrictEqual([...problems].map((p) => p.message), ['Block: View min should be a whole number from 1 to 30']);
 });
 
+test('items starting before 6 AM are reported, and still drawn from 6 AM', () => {
+  const tabs = JSON.parse(JSON.stringify(FIXTURE));
+  tabs['Week Plan'].push(['Coffee Walk', 'Early walk', 'Sat', '5:00 AM', '6:30 AM', 'Weekend - Home', '']);
+  const env = helpers.setUp(tabs);
+  const { problems } = env.app.readSchedule_();
+  assert.deepStrictEqual([...problems].map((p) => `${p.row} ${p.message}`), ["16 Coffee Walk: runs outside the grids' 6:00 AM – midnight; the part outside isn't shown"]);
+  env.app.drawAll_(false);
+  assert.strictEqual(env.book.dump().sheets.Weekends.cells.H5.v, 'Early walk', 'clipped to the 6:00 AM chunk');
+});
+
+test('Sort Week Plan: grid, then first day, then start; unreadable rows end their grid, blanks last', () => {
+  const tabs = JSON.parse(JSON.stringify(FIXTURE));
+  tabs['Week Plan'].splice(2, 0, ['Coffee Walk', '', 'Sat', '9:00 AM', '9:30 AM', 'Weekend - Home', 'home']);
+  tabs['Week Plan'].splice(1, 0, ['', '', '', '', '', '', '']);
+  tabs['Week Plan'].push(['Lunch', '', 'Someday', '12:00 PM', '1:00 PM', 'Weekday', 'broken']);
+  tabs['Week Plan'].push(['Coffee Walk', '', 'Fri', '7:00 PM', '9:00 PM', 'Weekend - Travel', 'travel']);
+  const env = helpers.setUp(tabs);
+  env.app.sortWeekPlan();
+  const rows = env.book.getSheetByName('Week Plan').getRange(2, 1, 18, 7).getValues();
+  const brief = rows.map((r) => (r[0] ? `${r[0]}|${r[2]}|${r[3]}` : ''));
+  assert.deepStrictEqual(brief, [
+    'Wake-Up|Mon-Fri|6:30 AM', 'Daily Prep|Mon-Fri|7:00 AM', 'Block|Mon-Fri|7:30 AM', 'Coffee Walk|Mon-Fri|9:30 AM',
+    'Block|Mon-Fri|10:00 AM', 'EMDR|Mon|12:00 PM', 'Block|Mon, Tue, Thu, Fri|1:00 PM', 'D&D|Mon|7:00 PM',
+    'Lunch|Tue, Thu, Fri|12:00 PM', 'Privates Block|Tue|4:00 PM', 'Reverie|Tue|6:00 PM', 'EMDR|Wed|11:00 AM',
+    'Block|Wed|3:00 PM', 'Privates Block|Thu|6:00 PM', 'Lunch|Someday|12:00 PM',
+    'Coffee Walk|Sat|9:00 AM', 'Coffee Walk|Fri|7:00 PM', '',
+  ]);
+  assert.strictEqual(rows[15][6], 'home', 'whole rows move together, notes included');
+});
+
 // ---------------------------------------------------------------- run
 
 helpers.run(tests);

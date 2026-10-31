@@ -7,7 +7,17 @@ function onOpen() {
     .createMenu('🗓️ Schedule')
     .addItem('🔄 Refresh everything', 'refreshAll')
     .addItem('⚠ Check data', 'checkData')
+    .addSeparator()
+    .addItem('↕️ Sort Week Plan', 'sortWeekPlan')
     .addToUi();
+}
+
+/** Menu: order the Week Plan by grid (Weekday, Home, Travel), then first day, then start time. */
+function sortWeekPlan() {
+  withLock_(() => {
+    sortPlanRows_();
+    drawAll_(false);
+  });
 }
 
 /** Menu: list every problem on the input tabs in one dialog (they're also in each tab's ⚠ Check column). */

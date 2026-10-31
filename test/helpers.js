@@ -26,7 +26,7 @@ function setUp(tabs, srcDir = SRC) {
   const app = vm.createContext({ ...env.globals });
   fs.readdirSync(srcDir).filter((f) => f.endsWith('.js')).sort()
     .forEach((f) => vm.runInContext(fs.readFileSync(path.join(srcDir, f), 'utf8'), app, { filename: f }));
-  return { app, book: env.book, alerts: env.alerts };
+  return { app, book: env.book, alerts: env.alerts, menus: env.menus };
 }
 
 /** Run a list of [name, fn] tests, print ✓/✗, and set the exit code. */

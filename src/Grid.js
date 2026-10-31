@@ -1,8 +1,9 @@
-// The week grids: Weekdays (Mon–Fri) and Weekends (home Sat–Sun, travel Fri–Sun). Each day is drawn from the Week Plan in the layout of the original
-// hand-built Schedule Planning tab: Schedule and Activities side by side, 30-minute chunks separated by thin
-// divider rows, colored bars on both sides of each item, and the item's label with a comment line at its start.
+// The week grids: Weekdays (Mon–Fri) and Weekends (home Sat–Sun, travel Fri–Sun). Each day is drawn from the Week
+// Plan in the layout of the original hand-built Schedule Planning tab: Schedule and Activities side by side,
+// 30-minute chunks separated by thin divider rows, colored bars on both sides of each item, and the item's label in
+// a box merged down its full length, outlined in a darker shade of its color.
 //
-// The tab is redrawn from scratch every time; nothing on it is typed by hand.
+// Nothing on these tabs is typed by hand; a tab is redrawn whole when its content changes (see redrawPlan_).
 
 // ---------------------------------------------------------------- entry points
 
@@ -67,10 +68,7 @@ function placeItems_(columns, schedule) {
     const end = Math.min(chunks, Math.round((p.end - TIME.dayStart) / TIME.chunk));
     columns.forEach((c, col) => {
       if (c.grid !== p.grid || !p.days.includes(c.day)) return;
-      if (end <= first) {
-        problems.push({ tab: TABS.plan, row: p.row, message: `${p.item}: outside the grid's ${formatTime_(TIME.dayStart)} – midnight` });
-        return;
-      }
+      if (end <= first) return;                              // entirely outside the grid (reported by readPlan_)
       blocks.push({ col, side: item.side, first, last: end - 1, label: p.label, color: item.color, row: p.row, item: p.item, day: c.day });
     });
   });
@@ -124,7 +122,7 @@ function layoutGrid_(columns, blocks) {
   }
 
   // Items: bars on both sides from the first chunk through the last (including the dividers between),
-  // and the label with its comment line on the first chunk
+  // and a label box down the same rows (see drawLabelBoxes_)
   blocks.forEach(b => {
     const cols = LAYOUT.side[b.side];
     const top = chunkRow_(b.first);

@@ -104,11 +104,47 @@ function readPlan_(catalog, problems) {
     if (end <= start) return report('End is not after Start');
     const outside = days.filter(d => !GRIDS[grid].includes(d));
     if (outside.length) return report(`${outside.join(', ')} isn't part of the ${grid} grid`);
+    if (start < TIME.dayStart || end > TIME.dayEnd) report(`runs outside the grids' ${formatTime_(TIME.dayStart)} – midnight; the part outside isn't shown`);
     if (start % TIME.chunk || end % TIME.chunk) report('times not on a half hour; grids round them to the nearest half hour');
 
     plan.push({ row: r.row, item, label: text_(v[c.label - 1]) || item, days, start, end, grid, notes: text_(v[c.notes - 1]) });
   });
   return plan;
+}
+
+/**
+ * Reorder the Week Plan's rows: by grid (in GRIDS order), then first day, then start time, then end time. A row
+ * whose days or times can't be read goes at the end of its grid (one with no readable grid, after all grids);
+ * blank rows go last. Ties keep their order. Only the typed columns move (⚠ Check is rewritten afterwards).
+ */
+function sortPlanRows_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(TABS.plan);
+  const count = sh.getLastRow() - PLAN.firstRow + 1;
+  if (count < 2) return;
+  const c = PLAN.col;
+  const range = sh.getRange(PLAN.firstRow, 1, count, c.notes);
+  const values = range.getValues();
+  const shown = range.getDisplayValues();
+  const grids = Object.keys(GRIDS);
+  const key = i => {
+    const v = values[i];
+    const days = parseDays_(text_(v[c.days - 1]));
+    const grid = grids.indexOf(text_(v[c.grid - 1]));
+    return [
+      v.every(x => text_(x) === '') ? 1 : 0,
+      grid < 0 ? grids.length : grid,
+      days ? DAYS.indexOf(days[0]) : DAYS.length,
+      parseTime_(shown[i][c.start - 1]) ?? Infinity,
+      parseTime_(shown[i][c.end - 1]) ?? Infinity,
+      i,
+    ];
+  };
+  const order = values.map((_, i) => key(i)).sort((a, b) => {
+    for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return a[k] - b[k];
+    return 0;
+  });
+  const sorted = order.map(k => values[k[k.length - 1]]);
+  if (order.some((k, i) => k[k.length - 1] !== i)) range.setValues(sorted);
 }
 
 // ---------------------------------------------------------------- parsing
