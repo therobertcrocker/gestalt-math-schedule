@@ -131,6 +131,7 @@ class FakeSheet {
         if (Object.keys(c.fmt).length) out.fmt = Object.fromEntries(Object.entries(c.fmt).sort());
         if (c.dv) out.dv = c.dv;
         if (c.rich) out.rich = c.rich;
+        if (c.note) out.note = c.note;
         if (Object.keys(out).length) cells[colLetter(col) + r] = out;
       });
     const sortMap = (m) => Object.fromEntries([...m.entries()].sort((a, b) => a[0] - b[0]));
@@ -186,6 +187,8 @@ class FakeRange {
   setFormulas(fs) { return this.each((c, i, j) => { const f = fs[i][j]; if (f) { c.f = f; c.v = ''; } else { c.f = ''; c.v = ''; } }); }
   setRichTextValue(rt) { return this.each((c) => { c.rich = plain(rt); c.v = ''; c.f = ''; }); }
   clearContent() { return this.each((c) => { c.v = ''; c.f = ''; c.rich = undefined; }); }
+  setNote(v) { return this.each((c) => { c.note = v; }); }
+  clearNote() { return this.each((c) => { delete c.note; }); }
   clearDataValidations() { return this.each((c) => { delete c.dv; }); }
   setDataValidation(dv) { return this.each((c) => { if (dv) c.dv = plain(dv); else delete c.dv; }); }
   insertCheckboxes() { return this.each((c) => { c.dv = { kind: 'checkbox' }; c.v = false; c.f = ''; }); }

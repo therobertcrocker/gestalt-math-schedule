@@ -45,8 +45,13 @@ const GRIDS = Object.freeze({
   'Weekend - Travel': Object.freeze(['Fri', 'Sat', 'Sun']),   // travel weekends start Friday
 });
 
-/** Catalog "Side" values: which column of a day an item is drawn in. */
-const SIDES = Object.freeze(['Schedule', 'Activities']);
+/**
+ * Catalog "Side" values: which column of a day an item is drawn in. A Touchstone isn't drawn as a block: it's a moment
+ * (someone wakes up, leaves, gets home), drawn as a line in its color across the day at its Start time, with a note
+ * naming it. Touchstones need no End, never count toward Stats, and don't get breakdowns.
+ */
+const SIDES = Object.freeze(['Schedule', 'Activities', 'Touchstone']);
+const TOUCHSTONE = 'Touchstone';
 
 /** The day every view covers, in minutes after midnight, and the size of one grid chunk. */
 const TIME = Object.freeze({ dayStart: 6 * 60, dayEnd: 24 * 60, chunk: 30 });

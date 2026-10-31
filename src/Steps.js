@@ -75,7 +75,7 @@ function ensureStepsTab_() {
  */
 function addMissingStepHeadings_(schedule) {
   const missing = [...schedule.catalog.values()]
-    .filter(item => item.breakdown && !schedule.stepHeadings.has(item.name))
+    .filter(item => item.breakdown && item.side !== TOUCHSTONE && !schedule.stepHeadings.has(item.name))
     .sort((a, b) => firstStart_(a.name, schedule.plan) - firstStart_(b.name, schedule.plan));
   if (!missing.length) return;
 

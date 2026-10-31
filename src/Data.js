@@ -10,7 +10,8 @@
  * Read every input tab. Returns { categories, catalog, plan, steps, stepHeadings, problems }:
  *  - categories:   [{ name, min, max, notes }]           (min/max are hours per week, or null)
  *  - catalog:      Map item name → { name, side, category, color, description, breakdown, viewMinutes }
- *  - plan:         [{ row, item, label, days, start, end, grid, notes }]   (start/end in minutes)
+ *  - plan:         [{ row, item, label, days, start, end, grid, notes, touchstone }]   (start/end in minutes;
+ *                  touchstones have no end)
  *  - steps:        Map item name → [{ step, min, row }]   (from the Steps tab; see Steps.js)
  *  - stepHeadings: Set of item names that have a heading on Steps
  *  - problems:     [{ tab, row, message }]
@@ -73,7 +74,7 @@ function readCatalog_(categories, problems) {
       if (Number.isInteger(n) && n >= 1 && n <= 30) item.viewMinutes = n;
       else report('View min should be a whole number from 1 to 30');
     }
-    if (!SIDES.includes(item.side)) report(`Side should be ${SIDES.join(' or ')}`);
+    if (!SIDES.includes(item.side)) report(`Side should be ${SIDES.slice(0, -1).join(', ')} or ${SIDES[SIDES.length - 1]}`);
     if (item.category && !known.has(item.category)) report(`category "${item.category}" isn't on Categories`);
     if (!/^#[0-9A-F]{6}$/.test(item.color)) report('Color should look like #9FC5E8');
     catalog.set(name, item);
@@ -100,14 +101,25 @@ function readPlan_(catalog, problems) {
     if (!catalog.has(item)) return report("isn't on the Catalog");
     if (!GRIDS[grid]) return report(`Grid should be one of: ${Object.keys(GRIDS).join(', ')}`);
     if (!days) return report('Days should look like "Mon-Fri" or "Tue, Thu"');
-    if (start === null || end === null) return report('Start and End need a time, like 7:30 AM');
-    if (end <= start) return report('End is not after Start');
     const outside = days.filter(d => !GRIDS[grid].includes(d));
     if (outside.length) return report(`${outside.join(', ')} isn't part of the ${grid} grid`);
+    const label = text_(v[c.label - 1]) || item;
+    const notes = text_(v[c.notes - 1]);
+
+    if (catalog.get(item).side === TOUCHSTONE) {                // a moment: Start only, End ignored
+      if (start === null) return report('Start needs a time, like 7:30 AM');
+      if (start < TIME.dayStart || start >= TIME.dayEnd) return report(`is outside the grids' ${formatTime_(TIME.dayStart)} – midnight`);
+      if (start % TIME.chunk) report('time not on a half hour; grids draw it at the nearest half hour');
+      plan.push({ row: r.row, item, label, days, start, end: null, grid, notes, touchstone: true });
+      return;
+    }
+
+    if (start === null || end === null) return report('Start and End need a time, like 7:30 AM');
+    if (end <= start) return report('End is not after Start');
     if (start < TIME.dayStart || end > TIME.dayEnd) report(`runs outside the grids' ${formatTime_(TIME.dayStart)} – midnight; the part outside isn't shown`);
     if (start % TIME.chunk || end % TIME.chunk) report('times not on a half hour; grids round them to the nearest half hour');
 
-    plan.push({ row: r.row, item, label: text_(v[c.label - 1]) || item, days, start, end, grid, notes: text_(v[c.notes - 1]) });
+    plan.push({ row: r.row, item, label, days, start, end, grid, notes, touchstone: false });
   });
   return plan;
 }

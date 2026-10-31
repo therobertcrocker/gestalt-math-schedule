@@ -45,7 +45,7 @@ function hslToHex_(h, s, l) {
 }
 
 /**
- * Wipe a sheet back to blank: values, formats, merges, dropdowns, highlight rules, hidden rows and columns.
+ * Wipe a sheet back to blank: values, formats, notes, merges, dropdowns, highlight rules, hidden rows and columns.
  * Row heights are reset to the default too, unless `keepSizes` (the caller knows they're already right).
  */
 function clearSheet_(sh, keepSizes) {
@@ -54,6 +54,7 @@ function clearSheet_(sh, keepSizes) {
   sh.showColumns(1, sh.getMaxColumns());
   all.breakApart();
   sh.clear();
+  all.clearNote();
   all.clearDataValidations();
   sh.clearConditionalFormatRules();
   if (!keepSizes) sh.setRowHeights(1, sh.getMaxRows(), 21);

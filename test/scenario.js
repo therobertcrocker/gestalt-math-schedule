@@ -40,6 +40,9 @@ function run(srcDir) {
   snap('a broken row');
   type('Week Plan', 18, 3, ['Wed']);
   snap('broken row fixed');
+  type('Catalog', 11, 1, ['Kate Home', 'Touchstone', '', '#A64D79', '', false, '']);
+  type('Week Plan', 19, 1, ['Kate Home', '', 'Mon, Thu', '8:30 PM', '', 'Weekday', '']);
+  snap('a touchstone');
   type('Catalog', 3, 1, ['Focus Block'], 'Block');
   snap('Block renamed');
   type('Catalog', 5, 6, [false]);

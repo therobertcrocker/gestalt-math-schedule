@@ -80,7 +80,7 @@ test('broken rows are reported, not fatal', () => {
   const { plan, problems } = app.readSchedule_();
   const messages = [...problems].map((p) => `${p.tab}:${p.row} ${p.message}`);
   assert.deepStrictEqual(messages, [
-    'Catalog:11 Yoga: Side should be Schedule or Activities',
+    'Catalog:11 Yoga: Side should be Schedule, Activities or Touchstone',
     'Catalog:11 Yoga: category "Fitness" isn\'t on Categories',
     'Catalog:11 Yoga: Color should look like #9FC5E8',
     "Week Plan:16 Nap: isn't on the Catalog",

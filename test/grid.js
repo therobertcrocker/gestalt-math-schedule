@@ -125,6 +125,54 @@ test('a Week Plan edit redraws every drawn tab', () => {
   assert.ok(book.getSheetByName('Weekends'), 'Weekends drawn too');
 });
 
+// ---------------------------------------------------------------- Touchstones
+
+/** The six touchstones from the hand-built sheet, as Catalog items (one per event) and Week Plan rows. */
+const TOUCHSTONES = (tabs) => {
+  tabs.Catalog.push(
+    ['Sam Wakes Up', 'Touchstone', '', '#6AA84F', '', false, ''],
+    ['Kate Wakes Up', 'Touchstone', '', '#A64D79', '', false, ''],
+    ['Kate Leaves', 'Touchstone', '', '#A64D79', '', false, ''],
+    ['Sam Leaves', 'Touchstone', '', '#B6D7A8', '', false, ''],
+    ['Kate Home', 'Touchstone', '', '#A64D79', '', false, ''],
+  );
+  tabs['Week Plan'].push(
+    ['Sam Wakes Up', '', 'Mon-Fri', '9:00 AM', '', 'Weekday', ''],
+    ['Kate Wakes Up', '', 'Mon-Fri', '11:00 AM', '', 'Weekday', ''],
+    ['Kate Leaves', '', 'Mon-Fri', '2:00 PM', '', 'Weekday', ''],
+    ['Sam Leaves', '', 'Thu', '5:30 PM', '', 'Weekday', ''],
+    ['Kate Home', '', 'Mon, Thu', '8:30 PM', '', 'Weekday', ''],
+    ['Kate Home', '', 'Tue', '9:30 PM', '', 'Weekday', ''],
+  );
+};
+
+test('touchstones: notes on the same cells as the hand-built sheet, with no problems', () => {
+  const { cells, problems, app } = drawn(TOUCHSTONES);
+  const notes = Object.fromEntries(Object.entries(cells).filter(([, c]) => c.note).map(([a1, c]) => [a1, c.note]));
+  assert.deepStrictEqual(notes, {
+    A17: 'Sam Wakes Up', A25: 'Kate Wakes Up', A37: 'Kate Leaves', AG51: 'Sam Leaves',
+    C63: 'Kate Home', AG63: 'Kate Home', M67: 'Kate Home',
+  });
+  assert.deepStrictEqual(problems, []);
+  assert.deepStrictEqual([...app.readSchedule_().problems], [], 'End can be left blank');
+});
+
+test('touchstones: an every-day line spans the whole week from the hour labels; a one-day line spans its day', () => {
+  const { cells } = drawn(TOUCHSTONES);
+  const top = (a1) => cells[a1] && cells[a1].fmt.border && cells[a1].fmt.border[0] === true ? cells[a1].fmt.border[6] : null;
+  assert.deepStrictEqual(['A17', 'H17', 'AW17'].map(top), ['#6AA84F', '#6AA84F', '#6AA84F'], 'Sam Wakes Up: A through Friday');
+  assert.deepStrictEqual(['AG51', 'AM51', 'AN51', 'AF51'].map(top), ['#B6D7A8', '#B6D7A8', null, null], 'Sam Leaves: Thursday only');
+});
+
+test('touchstones are not blocks: no bars, no overlaps, no Breakdowns group', () => {
+  const { cells, problems } = drawn((tabs) => {
+    TOUCHSTONES(tabs);
+    tabs.Catalog[tabs.Catalog.length - 1][5] = true;                        // Kate Home with Breakdown checked
+  });
+  assert.strictEqual(cells.C63.fmt.bg, '#FFFFFF', 'no bar drawn for Kate Home');
+  assert.deepStrictEqual(problems, []);
+});
+
 // ---------------------------------------------------------------- Weekends
 
 /** Draw Weekends with a few weekend rows added to the real data. */

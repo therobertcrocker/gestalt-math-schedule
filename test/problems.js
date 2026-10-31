@@ -56,7 +56,7 @@ test('several problems on one row are joined; overlaps land on the later row', (
     tabs['Week Plan'].push(['Coffee Walk', 'Late Coffee', 'Tue', '12:30 PM', '1:30 PM', 'Weekday', '']);
   });
   assert.deepStrictEqual(checks(book, 'Catalog', 8), {
-    11: 'Yoga: Side should be Schedule or Activities · Yoga: category "Fitness" isn\'t on Categories · Yoga: Color should look like #9FC5E8',
+    11: 'Yoga: Side should be Schedule, Activities or Touchstone · Yoga: category "Fitness" isn\'t on Categories · Yoga: Color should look like #9FC5E8',
   });
   assert.deepStrictEqual(checks(book, 'Week Plan', 8), { 16: 'Late Coffee overlaps Lunch on Tue (Activities)' });
 });

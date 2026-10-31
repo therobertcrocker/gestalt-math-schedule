@@ -24,7 +24,7 @@ function drawWeekends_(schedule, force) {
  */
 function drawGrid_(tabName, columns, schedule, force) {
   const placed = placeItems_(columns, schedule);
-  const page = layoutGrid_(columns, placed.blocks);
+  const page = layoutGrid_(columns, placed.blocks, touchstoneLines_(columns, schedule));
   const plan = redrawPlan_(tabName, page, { nRows: page.rows.length, nCols: page.nCols, grids: columns.map(c => c.grid), LAYOUT }, force);
   if (!plan.draw) return placed.problems;
 
@@ -35,6 +35,7 @@ function drawGrid_(tabName, columns, schedule, force) {
   paintRows_(sh, 1, page.rows, page.nCols);
   page.merges.forEach(([row, col, nRows, nCols]) => sh.getRange(row, col, nRows, nCols).merge());
   drawLabelBoxes_(sh, page.boxes);
+  drawTouchstones_(sh, page.lines);
   if (plan.resize) sizeGrid_(sh, columns, page);
   plan.remember();
   return placed.problems;
@@ -62,7 +63,7 @@ function placeItems_(columns, schedule) {
   const chunks = (TIME.dayEnd - TIME.dayStart) / TIME.chunk;
   const blocks = [];
   const problems = [];
-  schedule.plan.forEach(p => {
+  schedule.plan.filter(p => !p.touchstone).forEach(p => {
     const item = schedule.catalog.get(p.item);
     const first = Math.max(0, Math.round((p.start - TIME.dayStart) / TIME.chunk));
     const end = Math.min(chunks, Math.round((p.end - TIME.dayStart) / TIME.chunk));
@@ -85,10 +86,57 @@ function placeItems_(columns, schedule) {
 // ---------------------------------------------------------------- layout
 
 /**
- * Build the page: rows (Maps of column → cell), merges ([row, col, nRows, nCols]), label boxes
- * ([{ row, col, nRows, color }]) and the width in columns.
+ * Touchstone lines for one grid tab: [{ row, col, nCols, color, note, noteCol }]. A touchstone on every day of its
+ * section draws one line across the whole section (and the hour labels, for the first section) with the note on
+ * the hour label; otherwise one line per day across that day, with the note on the line's first cell.
  */
-function layoutGrid_(columns, blocks) {
+function touchstoneLines_(columns, schedule) {
+  const lines = [];
+  schedule.plan.filter(p => p.touchstone).forEach(p => {
+    const days = columns.map((c, d) => ({ c, d })).filter(x => x.c.grid === p.grid);
+    if (!days.length) return;
+    const row = chunkRow_(Math.round((p.start - TIME.dayStart) / TIME.chunk));
+    const color = schedule.catalog.get(p.item).color;
+    const on = days.filter(x => p.days.includes(x.c.day));
+    const lastCol = d => dayColumn_(columns, d, LAYOUT.side.Activities.barRight);
+    if (on.length === days.length) {
+      const first = days[0].d === 0 ? LAYOUT.hourCol : dayColumn_(columns, days[0].d, 0);
+      const last = lastCol(days[days.length - 1].d);
+      lines.push({ row, col: first, nCols: last - first + 1, color, note: p.label, noteCol: first });
+    } else {
+      on.forEach(({ d }) => {
+        const first = dayColumn_(columns, d, 0);
+        lines.push({ row, col: first, nCols: lastCol(d) - first + 1, color, note: p.label, noteCol: first });
+      });
+    }
+  });
+  return lines;
+}
+
+/**
+ * Touchstones: a line along the top of the touchstone's chunk row in its color (one call per color), and a note
+ * naming it. Notes at the same cell are joined.
+ */
+function drawTouchstones_(sh, lines) {
+  if (!lines.length) return;
+  const byColor = new Map();
+  const notes = new Map();
+  lines.forEach(l => {
+    const a1 = `${a1_(l.row, l.col)}:${a1_(l.row, l.col + l.nCols - 1)}`;
+    if (!byColor.has(l.color)) byColor.set(l.color, []);
+    byColor.get(l.color).push(a1);
+    const at = a1_(l.row, l.noteCol);
+    notes.set(at, notes.has(at) ? `${notes.get(at)}\n${l.note}` : l.note);
+  });
+  byColor.forEach((ranges, color) => sh.getRangeList(ranges).setBorder(true, null, null, null, null, null, color, SpreadsheetApp.BorderStyle.SOLID_MEDIUM));
+  notes.forEach((note, a1) => sh.getRange(a1).setNote(note));
+}
+
+/**
+ * Build the page: rows (Maps of column → cell), merges ([row, col, nRows, nCols]), label boxes
+ * ([{ row, col, nRows, color }]), touchstone lines (see touchstoneLines_) and the width in columns.
+ */
+function layoutGrid_(columns, blocks, lines) {
   const chunks = (TIME.dayEnd - TIME.dayStart) / TIME.chunk;
   const nRows = LAYOUT.firstChunkRow - 1 + chunks * 2 + 4;          // headers, chunks + dividers, the midnight label
   const nCols = dayColumn_(columns, columns.length - 1, LAYOUT.dayWidth - 1);
@@ -136,7 +184,7 @@ function layoutGrid_(columns, blocks) {
 
   const kept = keepSeparateBoxes_(boxes);
   kept.forEach(box => set(box.row, box.col, { value: box.label, halign: 'center' }));
-  return { rows, merges, boxes: kept, nCols };
+  return { rows, merges, boxes: kept, lines: lines || [], nCols };
 }
 
 /**

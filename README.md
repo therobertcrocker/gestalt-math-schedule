@@ -13,8 +13,8 @@ type in (its only write to an input tab is adding a heading on Steps when you ch
 | Tab | You edit it? | What it holds |
 |---|---|---|
 | Categories | yes | Category names, with optional Min/Max hours per week |
-| Catalog | yes | Every item: which side of the grid (Schedule / Activities), category, color, description, Breakdown checkbox, View min (minutes per Breakdowns view row; blank = 5) |
-| Week Plan | yes | When each item happens: item, optional label, days (`Mon-Fri`, `Tue, Thu`), start, end, which grid |
+| Catalog | yes | Every item: which side of the grid (Schedule / Activities / Touchstone), category, color, description, Breakdown checkbox, View min (minutes per Breakdowns view row; blank = 5) |
+| Week Plan | yes | When each item happens: item, optional label, days (`Mon-Fri`, `Tue, Thu`), start, end (blank for touchstones), which grid |
 | Steps | yes | Routine steps, grouped: a heading row with the item's name, then its steps (Step, Min). A step with no minutes is a ◆ marker in the view |
 | Breakdowns | no | One group per checked item, by start time: its steps at clock time in its Week Plan slot, flagging steps that run over |
 | Weekdays | no | Mon–Fri, drawn from the Week Plan in the original grid's layout (30-minute chunks, 10 columns per day) |
@@ -45,6 +45,14 @@ last drew (in the document's properties) and is skipped when the new page matche
 are only set when a tab's shape changes. **🗓️ Schedule → 🔄 Refresh everything** redraws every tab from scratch.
 The first refresh after this version creates the Steps tab and moves over any steps typed on the old Breakdowns
 layout, including ones parked in its hidden holding area.
+
+### Touchstones
+
+A Catalog item with Side = **Touchstone** is a moment rather than a block of time: someone wakes up, leaves, gets
+home. Its Week Plan rows need only a Start. The grids draw a line in the item's color along the top of that half
+hour, with a note naming it (the Week Plan label, or the item name). When it happens on every day of its grid, one
+line runs across the whole grid from the hour labels, with the note on the hour label; otherwise each day gets its
+own line. Touchstones don't count toward Stats and don't get breakdowns.
 
 ### Renaming an item
 
@@ -81,8 +89,8 @@ computer. `test/fixtures/schedule.json` is a copy of the real data tabs.
 - `test/breakdowns.js`: steps move over from the old layout; headings are added without touching typed rows;
   the view's clock times, free time, overflow, markers, per-item row sizes and multiple slots.
 - `test/grid.js`: every label lands in the same cell as on the hand-built Schedule Planning tab, with the same
-  bars, row heights and column widths; label boxes; overlaps are reported; Weekends puts home and travel days
-  side by side.
+  bars, row heights and column widths; label boxes; touchstone notes on the same cells as the hand-built sheet;
+  overlaps are reported; Weekends puts home and travel days side by side.
 - `test/redraw.js`: edits only redraw what they change, sizes are only set when needed, a repaint matches drawing
   from scratch, and Refresh everything always redraws.
 - `test/problems.js`: problems land in each tab's ⚠ Check column and clear when fixed; Check data lists them all.

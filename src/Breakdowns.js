@@ -22,7 +22,7 @@ function drawBreakdowns_(schedule, force) {
 /** Items with Breakdown checked, earliest start first: [{ item, steps, slots }]. */
 function shownGroups_(schedule) {
   return [...schedule.catalog.values()]
-    .filter(item => item.breakdown)
+    .filter(item => item.breakdown && item.side !== TOUCHSTONE)
     .map(item => ({ item, steps: schedule.steps.get(item.name) || [], slots: slotsFor_(item.name, schedule.plan) }))
     .sort((a, b) => firstStart_(a.item.name, schedule.plan) - firstStart_(b.item.name, schedule.plan));
 }
@@ -33,7 +33,7 @@ function shownGroups_(schedule) {
  */
 function slotsFor_(name, plan) {
   const slots = new Map();
-  plan.filter(p => p.item === name).forEach(p => {
+  plan.filter(p => p.item === name && !p.touchstone).forEach(p => {
     const key = p.start + '-' + p.end;
     if (!slots.has(key)) slots.set(key, { start: p.start, end: p.end, days: new Set(), grids: new Set() });
     p.days.forEach(d => slots.get(key).days.add(d));
