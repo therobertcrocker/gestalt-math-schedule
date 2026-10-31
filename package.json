@@ -1,0 +1,11 @@
+{
+  "name": "gestalt-math-schedule",
+  "private": true,
+  "description": "Apps Script for the Gestalt Math - Schedule Google Sheet",
+  "devDependencies": {
+    "@types/google-apps-script": "^1.0.0"
+  },
+  "scripts": {
+    "test": "TZ=America/Los_Angeles node test/data.js"
+  }
+}
