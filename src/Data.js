@@ -9,7 +9,8 @@
 /**
  * Read every input tab. Returns { categories, catalog, plan, steps, stepHeadings, problems }:
  *  - categories:   [{ name, min, max, notes }]           (min/max are hours per week, or null)
- *  - catalog:      Map item name → { name, side, category, color, description, breakdown, viewMinutes }
+ *  - catalog:      Map item name → { name, side, category, color, description, breakdown, viewMinutes, split }
+ *                  (split: [{ category, share }] with shares 0–1, or null)
  *  - plan:         [{ row, item, label, days, start, end, grid, notes, touchstone }]   (start/end in minutes;
  *                  touchstones have no end)
  *  - steps:        Map item name → [{ step, min, row }]   (from the Steps tab; see Steps.js)
@@ -52,7 +53,7 @@ function readCatalog_(categories, problems) {
   const c = CATALOG.col;
   const known = new Set(categories.map(cat => cat.name));
   const catalog = new Map();
-  readRows_(TABS.catalog, CATALOG.firstRow, 7).forEach(r => {
+  readRows_(TABS.catalog, CATALOG.firstRow, CATALOG.col.split).forEach(r => {
     const v = r.values;
     const name = text_(v[c.item - 1]);
     if (!name) return;
@@ -74,6 +75,7 @@ function readCatalog_(categories, problems) {
       if (Number.isInteger(n) && n >= 1 && n <= 30) item.viewMinutes = n;
       else report('View min should be a whole number from 1 to 30');
     }
+    item.split = parseSplit_(text_(v[c.split - 1]), known, report);
     if (!SIDES.includes(item.side)) report(`Side should be ${SIDES.slice(0, -1).join(', ')} or ${SIDES[SIDES.length - 1]}`);
     if (item.category && !known.has(item.category)) report(`category "${item.category}" isn't on Categories`);
     if (!/^#[0-9A-F]{6}$/.test(item.color)) report('Color should look like #9FC5E8');
@@ -160,6 +162,22 @@ function sortPlanRows_() {
 }
 
 // ---------------------------------------------------------------- parsing
+
+/**
+ * A Split cell → [{ category, share }] (share 0–1), or null when blank. "Work 70%, House Projects 20%" (the % is
+ * optional). Shares can't add up to more than 100%; whatever's left over counts as Not counted in Stats.
+ * Anything unreadable is reported and the split ignored (the item then counts toward its Category).
+ */
+function parseSplit_(textValue, knownCategories, report) {
+  if (!textValue) return null;
+  const parts = textValue.split(',').map(part => part.trim().match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*%?$/));
+  if (parts.some(m => !m)) { report('Split should look like "Work 70%, House Projects 20%"'); return null; }
+  const split = parts.map(m => ({ category: m[1].trim(), share: Number(m[2]) / 100 }));
+  const unknown = split.filter(s => !knownCategories.has(s.category)).map(s => s.category);
+  if (unknown.length) { report(`Split: "${unknown.join('", "')}" isn't on Categories`); return null; }
+  if (split.reduce((sum, s) => sum + s.share, 0) > 1.0001) { report('Split adds up to more than 100%'); return null; }
+  return split;
+}
 
 /**
  * "Mon-Fri", "Tue, Thu, Fri", "Sat" or a mix ("Mon, Wed-Fri") → ['Mon', 'Wed', 'Thu', 'Fri'], in week order.

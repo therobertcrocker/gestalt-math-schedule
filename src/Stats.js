@@ -2,7 +2,8 @@
 // tables: week totals with a target status, hours per day, and the open time left each day.
 //
 // Counting: each weekday is laid out minute by minute from 6 AM to midnight. Schedule blocks go down first, then
-// Activities on top, so an Activity takes the time of any block it overlaps and every minute counts once.
+// Activities on top, so an Activity takes the time of any block it overlaps and every minute counts once. An item with
+// a Split on the Catalog shares each of its minutes between categories; the rest of the minute is Not counted.
 
 // ---------------------------------------------------------------- entry point
 
@@ -33,25 +34,35 @@ function drawStats_(schedule, force) {
 function countWeek_(schedule) {
   const days = GRIDS[STATS.grid];
   const length = TIME.dayEnd - TIME.dayStart;
+  const open = [{ bucket: STATS.open, share: 1 }];
   const byDay = new Map();
   const totals = new Map();
   days.forEach(day => {
-    const minutes = new Array(length).fill(STATS.open);
+    const minutes = new Array(length).fill(open);                // each minute: [{ bucket, share }]
     ['Schedule', 'Activities'].forEach(side => {                // Activities last, so they win overlaps
       schedule.plan
         .filter(p => !p.touchstone && p.grid === STATS.grid && p.days.includes(day))
         .filter(p => schedule.catalog.get(p.item).side === side)
         .forEach(p => {
-          const bucket = schedule.catalog.get(p.item).category || STATS.uncounted;
-          for (let m = Math.max(p.start, TIME.dayStart); m < Math.min(p.end, TIME.dayEnd); m++) minutes[m - TIME.dayStart] = bucket;
+          const shares = itemShares_(schedule.catalog.get(p.item));
+          for (let m = Math.max(p.start, TIME.dayStart); m < Math.min(p.end, TIME.dayEnd); m++) minutes[m - TIME.dayStart] = shares;
         });
     });
     const counts = new Map();
-    minutes.forEach(bucket => counts.set(bucket, (counts.get(bucket) || 0) + 1));
+    minutes.forEach(shares => shares.forEach(s => counts.set(s.bucket, (counts.get(s.bucket) || 0) + s.share)));
     byDay.set(day, counts);
     counts.forEach((n, bucket) => totals.set(bucket, (totals.get(bucket) || 0) + n));
   });
   return { days, byDay, totals };
+}
+
+/** How one minute of an item is shared: its Split (the rest Not counted), else all to its Category. */
+function itemShares_(item) {
+  if (!item.split) return [{ bucket: item.category || STATS.uncounted, share: 1 }];
+  const shares = item.split.map(s => ({ bucket: s.category, share: s.share }));
+  const rest = 1 - shares.reduce((sum, s) => sum + s.share, 0);
+  if (rest > 0.0001) shares.push({ bucket: STATS.uncounted, share: rest });
+  return shares;
 }
 
 /** Where a total sits against a category's target: { text, color }. */
@@ -116,10 +127,10 @@ function layoutStats_(week, categories) {
 
 // ---------------------------------------------------------------- formatting
 
-/** 29 → "29h", 2.5 → "2.5h", 0.25 → "0.25h", 0 → "–". */
+/** 29 → "29h", 2.5 → "2.5h", 20.299999 → "20.3h", 0 → "–" (to the nearest 0.1h, a shade under 0.05h shows as "–"). */
 function formatHours_(hours) {
-  if (!hours) return '–';
-  return `${Math.round(hours * 100) / 100}h`;
+  const rounded = Math.round(hours * 10) / 10;
+  return rounded ? `${rounded}h` : '–';
 }
 
 /** A category's target as text: "25–30h", "≥ 8h", "≤ 2h", or "–". */

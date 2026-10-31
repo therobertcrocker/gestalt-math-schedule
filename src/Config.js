@@ -67,11 +67,13 @@ const CATEGORIES = Object.freeze({
 
 /**
  * Catalog: one row per item. Color is a "#RRGGBB" string; Breakdown is a checkbox; View min is how many minutes
- * each row of the item's Breakdowns view covers (blank = BREAKDOWNS.minutesPerRow).
+ * each row of the item's Breakdowns view covers (blank = BREAKDOWNS.minutesPerRow). Split shares the item's hours
+ * between categories for Stats ("Work 70%, House Projects 20%"; the rest is Not counted); blank = all to Category.
  */
 const CATALOG = Object.freeze({
   firstRow: 2,
-  col: Object.freeze({ item: 1, side: 2, category: 3, color: 4, description: 5, breakdown: 6, viewMinutes: 7 }),
+  col: Object.freeze({ item: 1, side: 2, category: 3, color: 4, description: 5, breakdown: 6, viewMinutes: 7, split: 8 }),
+  splitHeader: 'Split',
 });
 
 /** Week Plan: one row per placement. Days like "Mon-Fri" or "Tue, Thu"; Start/End are times of day. */
@@ -174,7 +176,7 @@ const STATS = Object.freeze({
  */
 const CHECK = Object.freeze({
   header: '⚠ Check',
-  col: Object.freeze({ Categories: 5, Catalog: 8, 'Week Plan': 8, Steps: 4 }),   // by tab name (see TABS)
+  col: Object.freeze({ Categories: 5, Catalog: 9, 'Week Plan': 8, Steps: 4 }),   // by tab name (see TABS)
   width: 320,
 });
 

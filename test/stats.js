@@ -63,6 +63,30 @@ test('targets: on target, under and over, with the gap', () => {
   assert.deepStrictEqual(t.totals['Partner Time'].slice(0, 3), ['–', '–', '']);
 });
 
+test('a Split shares focus block hours; the rest (personal work) is Not counted', () => {
+  const { table: t } = drawn((tabs) => { tabs.Catalog[2][7] = 'Work 70%, House Projects 20%'; });   // Block
+  const hours = Object.fromEntries(Object.entries(t.totals).map(([k, v]) => [k, v[0]]));
+  assert.strictEqual(hours['Work'], '20.3h');                 // 29h × 70%
+  assert.strictEqual(hours['House Projects'], '5.8h');        // 29h × 20%
+  assert.strictEqual(hours['Not counted'], '5.9h');           // Lunch 3h + 29h × 10%
+  assert.deepStrictEqual(t.perDay['Work'], ['4.2h', '4.2h', '3.5h', '4.2h', '4.2h', '20.3h']);
+  const week = Object.values(t.perDay).map((r) => parseFloat(r[5]) || 0).reduce((a, b) => a + b, 0);
+  assert.strictEqual(Math.round(week * 10) / 10, 90, 'still 90 hours in all');
+});
+
+test('a Split that can\'t be used is reported, and the item counts toward its Category', () => {
+  const cases = [
+    ['Work seventy', 'Block: Split should look like "Work 70%, House Projects 20%"'],
+    ['Work 70%, Chores 20%', 'Block: Split: "Chores" isn\'t on Categories'],
+    ['Work 80%, House Projects 30%', 'Block: Split adds up to more than 100%'],
+  ];
+  cases.forEach(([split, message]) => {
+    const { app, table: t } = drawn((tabs) => { tabs.Catalog[2][7] = split; });
+    assert.deepStrictEqual([...app.readSchedule_().problems].map((p) => p.message), [message]);
+    assert.strictEqual(t.totals['Work'][0], '29h');
+  });
+});
+
 test('touchstones and weekend rows are not counted', () => {
   const { table: t } = drawn((tabs) => {
     tabs.Catalog.push(['Kate Home', 'Touchstone', 'Partner Time', '#A64D79', '', false, '']);

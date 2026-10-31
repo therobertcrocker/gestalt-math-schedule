@@ -13,7 +13,7 @@ type in (its only write to an input tab is adding a heading on Steps when you ch
 | Tab | You edit it? | What it holds |
 |---|---|---|
 | Categories | yes | Category names, with optional Min/Max hours per week |
-| Catalog | yes | Every item: which side of the grid (Schedule / Activities / Touchstone), category, color, description, Breakdown checkbox, View min (minutes per Breakdowns view row; blank = 5) |
+| Catalog | yes | Every item: which side of the grid (Schedule / Activities / Touchstone), category, color, description, Breakdown checkbox, View min (minutes per Breakdowns view row; blank = 5), Split (share an item's hours between categories in Stats) |
 | Week Plan | yes | When each item happens: item, optional label, days (`Mon-Fri`, `Tue, Thu`), start, end (blank for touchstones), which grid |
 | Steps | yes | Routine steps, grouped: a heading row with the item's name, then its steps (Step, Min). A step with no minutes is a ◆ marker in the view |
 | Breakdowns | no | One group per checked item, by start time: its steps at clock time in its Week Plan slot, flagging steps that run over |
@@ -62,6 +62,10 @@ Activity takes the time of any block it overlaps (Wednesday's EMDR takes an hour
 minute counts once. Items with no category count as **Not counted**; minutes with nothing on either side are
 **Open time**. Touchstones and weekend rows aren't counted. Targets are the Min/Max hours on Categories.
 
+An item with a **Split** on the Catalog shares its hours instead of giving them all to its Category: focus blocks
+with `Work 70%, House Projects 20%` put 70% of every block minute toward Work, 20% toward House Projects, and the
+remaining 10% (personal work) under Not counted. A Split that can't be read is reported and ignored.
+
 ### Renaming an item
 
 Change a name in the Catalog's Item column and it's carried to every Week Plan row and Steps heading that used it
@@ -103,7 +107,7 @@ computer. `test/fixtures/schedule.json` is a copy of the real data tabs.
   from scratch, and Refresh everything always redraws.
 - `test/problems.js`: problems land in each tab's ⚠ Check column and clear when fixed; Check data lists them all.
 - `test/rename.js`: a Catalog rename reaches the Week Plan and Steps, but never merges two items.
-- `test/stats.js`: hours per category and per day from the real Week Plan, open time, target statuses.
+- `test/stats.js`: hours per category and per day from the real Week Plan, open time, target statuses, splits.
 
 ## Checking a refactor: `npm run compare`
 

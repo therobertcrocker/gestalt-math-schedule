@@ -65,6 +65,13 @@ class FakeSheet {
   getMaxColumns() { return this.maxCols; }
   insertRowsAfter(_, n) { this.maxRows += n; }
   insertColumnsAfter(_, n) { this.maxCols += n; }
+  /** Shift every cell at or right of `col` one column right, like Sheets does. */
+  insertColumnBefore(col) {
+    const moved = new Map();
+    this.cells.forEach((cell, k) => { const [r, c] = k.split(',').map(Number); moved.set(`${r},${c >= col ? c + 1 : c}`, cell); });
+    this.cells = moved;
+    this.maxCols += 1;
+  }
   deleteRows(r, n) { this.maxRows = r - 1 + Math.max(0, this.maxRows - (r - 1) - n); this.dropCells((row) => row >= r && row < r + n); }
   deleteColumns(c, n) { this.maxCols = c - 1 + Math.max(0, this.maxCols - (c - 1) - n); this.dropCells((_, col) => col >= c && col < c + n); }
   dropCells(test) { [...this.cells.keys()].forEach((k) => { const [r, c] = k.split(',').map(Number); if (test(r, c)) this.cells.delete(k); }); }

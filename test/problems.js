@@ -35,7 +35,7 @@ const test = (name, fn) => tests.push([name, fn]);
 
 test('clean data: every input tab gets an empty ⚠ Check column', () => {
   const { book } = drawn();
-  [['Categories', 'E'], ['Catalog', 'H'], ['Week Plan', 'H'], ['Steps', 'D']].forEach(([tab, col]) => {
+  [['Categories', 'E'], ['Catalog', 'I'], ['Week Plan', 'H'], ['Steps', 'D']].forEach(([tab, col]) => {
     assert.strictEqual(book.dump().sheets[tab].cells[`${col}1`].v, '⚠ Check', tab);
   });
   assert.deepStrictEqual(checks(book, 'Week Plan', 8), {});
@@ -55,10 +55,22 @@ test('several problems on one row are joined; overlaps land on the later row', (
     tabs.Catalog.push(['Yoga', 'Middle', 'Fitness', 'green', '', false, '']);
     tabs['Week Plan'].push(['Coffee Walk', 'Late Coffee', 'Tue', '12:30 PM', '1:30 PM', 'Weekday', '']);
   });
-  assert.deepStrictEqual(checks(book, 'Catalog', 8), {
+  assert.deepStrictEqual(checks(book, 'Catalog', 9), {
     11: 'Yoga: Side should be Schedule, Activities or Touchstone · Yoga: category "Fitness" isn\'t on Categories · Yoga: Color should look like #9FC5E8',
   });
   assert.deepStrictEqual(checks(book, 'Week Plan', 8), { 16: 'Late Coffee overlaps Lunch on Tue (Activities)' });
+});
+
+test('upgrade: an old Catalog with ⚠ Check in H gets Split in H and ⚠ Check moves to I, nothing typed lost', () => {
+  const { book } = drawn((tabs) => {
+    tabs.Catalog[0].push('⚠ Check');
+    tabs.Catalog[1].push('old message');
+  });
+  const row1 = book.getSheetByName('Catalog').getRange(1, 1, 1, 9).getValues()[0];
+  assert.deepStrictEqual(row1.slice(6), ['View min', 'Split', '⚠ Check']);
+  assert.strictEqual(book.getSheetByName('Catalog').getRange(2, 7).getValue(), 1, "Wake-Up's View min untouched");
+  assert.deepStrictEqual(checks(book, 'Catalog', 9), {}, 'the stale message is cleared from its new spot');
+  assert.deepStrictEqual(checks(book, 'Catalog', 8), {}, 'and nothing is left in Split');
 });
 
 test('Steps problems are marked on Steps', () => {

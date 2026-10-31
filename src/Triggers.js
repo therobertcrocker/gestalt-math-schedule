@@ -55,6 +55,7 @@ function onEdit(e) {
  * Steps tab the first time (moving over steps from the first Breakdowns layout).
  */
 function drawAll_(force) {
+  upgradeInputTabs_();
   ensureStepsTab_();
   const schedule = readSchedule_();
   addMissingStepHeadings_(schedule);
@@ -64,6 +65,23 @@ function drawAll_(force) {
   const problems = [...schedule.problems, ...gridProblems];
   reportProblems_(problems);
   return problems;
+}
+
+/**
+ * Bring input tabs laid out by an earlier version up to date, without touching anything typed:
+ *  - Catalog: a Split column before ⚠ Check (which used to sit where Split now goes).
+ */
+function upgradeInputTabs_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(TABS.catalog);
+  if (!sh) return;
+  const col = CATALOG.col.split;
+  ensureSheetSize_(sh, sh.getMaxRows(), col);
+  const header = text_(sh.getRange(1, col).getValue());
+  if (header === CATALOG.splitHeader) return;
+  if (header === CHECK.header) sh.insertColumnBefore(col);       // the old ⚠ Check column moves one to the right
+  else if (header) return;                                       // something typed there: leave it alone
+  sh.getRange(1, col).setValue(CATALOG.splitHeader).setFontWeight('bold').setBackground(COLOR.titleBand);
+  sh.setColumnWidth(col, 220);
 }
 
 /** Run fn while holding the document lock, so two redraws never overlap. */
