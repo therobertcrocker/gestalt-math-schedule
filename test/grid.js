@@ -145,14 +145,24 @@ test('Weekends: home Sat–Sun then travel Fri–Sun, side by side', () => {
   assert.deepStrictEqual([...schedule.problems], [], 'travel Friday is allowed');
   assert.deepStrictEqual(problems, []);
   const c = dump.cells;
-  assert.deepStrictEqual(['C1', 'M1', 'W1', 'AG1', 'AQ1'].map((a) => c[a].v),
+  // Travel days start 3 columns later than they would without the section break (W → Z)
+  assert.deepStrictEqual(['C1', 'M1', 'Z1', 'AJ1', 'AT1'].map((a) => c[a].v),
     ['Saturday · Home', 'Sunday · Home', 'Friday · Travel', 'Saturday · Travel', 'Sunday · Travel']);
   assert.deepStrictEqual(labels(c), {
     'Wake-Up': ['D13', 'N13'],              // 8:00 AM on both home days
-    'Event': ['X53'],                        // travel Friday 6 PM
-    'Coffee Walk': ['AL21'],                 // travel Saturday 10 AM
+    'Event': ['AA53'],                       // travel Friday 6 PM
+    'Coffee Walk': ['AO21'],                 // travel Saturday 10 AM
   });
-  assert.deepStrictEqual(dump.size, [80, 52]);
+  assert.deepStrictEqual(dump.size, [80, 55]);
+});
+
+test('Weekends: a wide dark band between Home and Travel', () => {
+  const { dump } = weekends();
+  // Sunday · Home ends at column V (22); then W white 10px, X dark 20px, Y white 10px; Travel starts at Z
+  assert.deepStrictEqual([23, 24, 25].map((col) => dump.colWidths[col]), [10, 20, 10]);
+  assert.strictEqual(dump.cells.X40.fmt.bg, '#434343');
+  assert.strictEqual(dump.cells.W40.fmt.bg, '#FFFFFF');
+  assert.strictEqual(dump.cells.Y40.fmt.bg, '#FFFFFF');
 });
 
 test('weekday rows stay off Weekends, and weekend rows stay off Weekdays', () => {

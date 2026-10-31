@@ -36,7 +36,8 @@ function drawGrid_(tabName, columns, schedule) {
   page.rows.forEach((_, i) => sh.setRowHeight(i + 1, (i % 2 === 0) ? LAYOUT.heights.chunk : LAYOUT.heights.line));
   sh.setColumnWidth(LAYOUT.hourCol, LAYOUT.hourWidth);
   sh.setColumnWidth(LAYOUT.hourCol + 1, LAYOUT.gutterWidth);
-  columns.forEach((_, d) => LAYOUT.widths.forEach((px, offset) => sh.setColumnWidth(dayColumn_(d, offset), px)));
+  columns.forEach((_, d) => LAYOUT.widths.forEach((px, offset) => sh.setColumnWidth(dayColumn_(columns, d, offset), px)));
+  sectionBreakColumns_(columns).forEach(start => LAYOUT.sectionBreak.forEach((part, offset) => sh.setColumnWidth(start + offset, part.width)));
   sh.setFrozenRows(LAYOUT.subHeaderRow + 1);
   sh.setFrozenColumns(LAYOUT.hourCol + 1);
   return placed.problems;
@@ -85,7 +86,8 @@ function placeItems_(columns, schedule) {
 function layoutGrid_(columns, blocks) {
   const chunks = (TIME.dayEnd - TIME.dayStart) / TIME.chunk;
   const nRows = LAYOUT.firstChunkRow - 1 + chunks * 2 + 4;          // headers, chunks + dividers, the midnight label
-  const nCols = dayColumn_(columns.length - 1, LAYOUT.dayWidth - 1);
+  const nCols = dayColumn_(columns, columns.length - 1, LAYOUT.dayWidth - 1);
+  const breaks = sectionBreakColumns_(columns);
   const rows = Array.from({ length: nRows }, () => new Map());
   const merges = [];
   const boxes = [];
@@ -94,14 +96,19 @@ function layoutGrid_(columns, blocks) {
   // Headers
   columns.forEach((c, d) => {
     const s = LAYOUT.side;
-    set(LAYOUT.headerRow, dayColumn_(d, 0), { value: c.title, bold: true, size: 14, halign: 'center' });
-    merges.push([LAYOUT.headerRow, dayColumn_(d, 0), 1, s.Activities.barRight + 1]);
+    set(LAYOUT.headerRow, dayColumn_(columns, d, 0), { value: c.title, bold: true, size: 14, halign: 'center' });
+    merges.push([LAYOUT.headerRow, dayColumn_(columns, d, 0), 1, s.Activities.barRight + 1]);
     Object.entries(s).forEach(([name, cols]) => {
-      set(LAYOUT.subHeaderRow, dayColumn_(d, cols.barLeft), { value: name, bold: true, halign: 'center', line: true });
-      merges.push([LAYOUT.subHeaderRow, dayColumn_(d, cols.barLeft), 1, 3]);
+      set(LAYOUT.subHeaderRow, dayColumn_(columns, d, cols.barLeft), { value: name, bold: true, halign: 'center', line: true });
+      merges.push([LAYOUT.subHeaderRow, dayColumn_(columns, d, cols.barLeft), 1, 3]);
     });
-    for (let r = 1; r <= nRows; r++) set(r, dayColumn_(d, LAYOUT.separator), { bg: COLOR.separator });
+    for (let r = 1; r <= nRows; r++) set(r, dayColumn_(columns, d, LAYOUT.separator), { bg: COLOR.separator });
   });
+
+  // Section breaks: a wide dark band, white on either side
+  breaks.forEach(start => LAYOUT.sectionBreak.forEach((part, offset) => {
+    if (part.dark) for (let r = 1; r <= nRows; r++) set(r, start + offset, { bg: COLOR.separator });
+  }));
 
   // Hour labels down the left, each spanning chunk · divider · chunk; the last one marks midnight
   for (let minutes = TIME.dayStart, row = LAYOUT.firstChunkRow; minutes <= TIME.dayEnd; minutes += 60, row += 4) {
@@ -116,10 +123,10 @@ function layoutGrid_(columns, blocks) {
     const top = chunkRow_(b.first);
     const bottom = chunkRow_(b.last);
     for (let r = top; r <= bottom; r++) {
-      set(r, dayColumn_(b.col, cols.barLeft), { bg: b.color });
-      set(r, dayColumn_(b.col, cols.barRight), { bg: b.color });
+      set(r, dayColumn_(columns, b.col, cols.barLeft), { bg: b.color });
+      set(r, dayColumn_(columns, b.col, cols.barRight), { bg: b.color });
     }
-    boxes.push({ row: top, col: dayColumn_(b.col, cols.label), nRows: bottom - top + 1, color: outlineColor_(b.color), label: b.label });
+    boxes.push({ row: top, col: dayColumn_(columns, b.col, cols.label), nRows: bottom - top + 1, color: outlineColor_(b.color), label: b.label });
   });
 
   const kept = keepSeparateBoxes_(boxes);
@@ -160,9 +167,28 @@ function drawLabelBoxes_(sh, boxes) {
   sh.getRangeList([].concat(...byColor.values())).setWrap(true);
 }
 
-/** Sheet column of a cell inside the d-th day (0-based), counted from the day's first column. */
-function dayColumn_(d, offset) {
-  return LAYOUT.firstDayCol + d * LAYOUT.dayWidth + offset;
+/**
+ * Sheet column of a cell inside the d-th day (0-based), counted from the day's first column. Where the grid
+ * switches sections (Home → Travel on Weekends), a section break sits between the two days.
+ */
+function dayColumn_(columns, d, offset) {
+  return LAYOUT.firstDayCol + d * LAYOUT.dayWidth + sectionBreaksBefore_(columns, d) * LAYOUT.sectionBreak.length + offset;
+}
+
+/** How many section breaks come before the d-th day: one each time the Week Plan grid changes. */
+function sectionBreaksBefore_(columns, d) {
+  let breaks = 0;
+  for (let i = 1; i <= d; i++) if (columns[i].grid !== columns[i - 1].grid) breaks++;
+  return breaks;
+}
+
+/** First sheet column of each section break (the white gap before the dark band). */
+function sectionBreakColumns_(columns) {
+  const starts = [];
+  columns.forEach((c, d) => {
+    if (d > 0 && c.grid !== columns[d - 1].grid) starts.push(dayColumn_(columns, d, 0) - LAYOUT.sectionBreak.length);
+  });
+  return starts;
 }
 
 /** Sheet row of a 30-minute chunk (0 = 6:00 AM). */
