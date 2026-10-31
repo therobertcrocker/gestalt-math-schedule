@@ -56,7 +56,8 @@ the new name already belongs to another Catalog row, or another row still uses t
 
 A row that can't be used (an unknown item, End before Start, a day its grid doesn't have, overlapping items…) gets
 its reason in the **⚠ Check** column at the right edge of its tab, and its column-A cell is highlighted. The message
-clears itself once the row is fixed. **🗓️ Schedule → ⚠ Check data** lists every problem at once.
+clears itself once the row is fixed. **🗓️ Schedule → ⚠ Check data** lists every problem at once. **↕️ Sort Week Plan** orders its rows by grid,
+first day, then start time.
 
 ## Conventions
 
@@ -86,6 +87,21 @@ computer. `test/fixtures/schedule.json` is a copy of the real data tabs.
   from scratch, and Refresh everything always redraws.
 - `test/problems.js`: problems land in each tab's ⚠ Check column and clear when fixed; Check data lists them all.
 - `test/rename.js`: a Catalog rename reaches the Week Plan and Steps, but never merges two items.
+
+## Checking a refactor: `npm run compare`
+
+`test/scenario.js` plays through a realistic session (steps moving off the old Breakdowns layout, step edits, moving
+an item, weekend rows, a broken row and its fix, a rename, unchecking a breakdown, sorting) and snapshots the whole
+spreadsheet after each step. `npm run compare` runs it on your working copy and on another commit, then lists every
+difference.
+
+```sh
+npm run compare            # against origin/main
+npm run compare -- HEAD~1  # …or any other commit
+```
+
+**No differences** means a cleanup changed nothing the sheet can see. For a change that's meant to alter the sheet,
+the differences should be exactly the intended ones. GitHub runs `npm test` on every push.
 
 ## Workflow
 
