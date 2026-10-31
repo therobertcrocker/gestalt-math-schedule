@@ -6,6 +6,44 @@ function ensureSheetSize_(sh, rows, cols) {
   if (sh.getMaxRows() < rows) sh.insertRowsAfter(sh.getMaxRows(), rows - sh.getMaxRows());
 }
 
+/** Make a sheet exactly `rows` × `cols`, adding or deleting rows and columns at the end. */
+function fitSheetSize_(sh, rows, cols) {
+  ensureSheetSize_(sh, rows, cols);
+  if (sh.getMaxRows() > rows) sh.deleteRows(rows + 1, sh.getMaxRows() - rows);
+  if (sh.getMaxColumns() > cols) sh.deleteColumns(cols + 1, sh.getMaxColumns() - cols);
+}
+
+/**
+ * A darker shade of a "#RRGGBB" color, for outlines: same hue, lightness brought down to about the middle,
+ * saturation kept in a range that reads as color rather than grey or neon. Close to Google's own "dark" palette
+ * (e.g. #9FC5E8 → about #3D85C6).
+ */
+function outlineColor_(hex) {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const light = (max + min) / 2;
+  const delta = max - min;
+  let hue = 0;
+  if (delta) {
+    if (max === r) hue = ((g - b) / delta) % 6;
+    else if (max === g) hue = (b - r) / delta + 2;
+    else hue = (r - g) / delta + 4;
+  }
+  hue = (hue * 60 + 360) % 360;
+  const sat = delta ? delta / (1 - Math.abs(2 * light - 1)) : 0;
+  return hslToHex_(hue, Math.min(0.85, Math.max(0.35, sat)), Math.min(light, 0.5));
+}
+
+/** Hue (degrees), saturation and lightness (0–1) → "#RRGGBB". */
+function hslToHex_(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return '#' + [r, g, b].map(v => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
 /** Wipe a sheet back to blank: values, formats, merges, dropdowns, highlight rules, hidden rows and columns. */
 function clearSheet_(sh) {
   const all = sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns());

@@ -52,9 +52,19 @@ test('every label lands in the same cell as on the hand-built grid', () => {
   assert.deepStrictEqual(labels(cells), sorted);
 });
 
-test('labels carry a comment line; bars run the full length on both sides', () => {
+test('labels are boxes merged down the item, outlined in a darker shade, as on the hand-built grid', () => {
+  const { cells, dump } = drawn();
+  assert.ok(dump.merges.includes('11,4,17,4'), 'Early Morning Block label spans 7:30–9:30 (rows 11–17)');
+  assert.ok(dump.merges.includes('57,8,67,8'), 'D&D label spans 7–10 PM');
+  assert.ok(!dump.merges.some((m) => m.startsWith('7,4,')), 'one-chunk Wake-Up is a single cell, not merged');
+  assert.deepStrictEqual(cells.D11.fmt.border.slice(0, 4), [true, true, true, true], 'outlined on all four sides');
+  assert.strictEqual(cells.D11.fmt.border[6], '#3183CE', 'a darker blue than the #9FC5E8 bars');
+  assert.strictEqual(cells.D7.fmt.border[6], '#ECB513', 'Wake-Up: darker yellow');
+  assert.strictEqual(cells.D11.fmt.wrap, true);
+});
+
+test('bars run the full length on both sides', () => {
   const { cells } = drawn();
-  assert.strictEqual(cells.D11.fmt.border[2], true, 'Early Morning Block label has a bottom line');
   // Early Morning Block on Monday: 7:30–9:30 → chunk rows 11, 13, 15, 17 plus the dividers between
   for (let r = 11; r <= 17; r++) {
     assert.strictEqual(cells[`C${r}`].fmt.bg, '#9FC5E8', `left bar, row ${r}`);
@@ -76,9 +86,9 @@ test('headers, hour labels and separators are where they were', () => {
   assert.strictEqual(cells.K40.fmt.bg, '#434343', 'dark separator after Monday');
 });
 
-test('row heights alternate 21/5 and column widths match the hand-built grid', () => {
+test('the tab is exactly the grid: 80 rows, 52 columns; heights and widths match the hand-built grid', () => {
   const { dump } = drawn();
-  assert.strictEqual(Object.keys(dump.rowHeights).length >= 80, true);
+  assert.deepStrictEqual(dump.size, [80, 52]);
   for (let r = 1; r <= 80; r++) assert.strictEqual(dump.rowHeights[r], r % 2 ? 21 : 5, `row ${r}`);
   const widths = [100, 5, 25, 100, 25, 5, 25, 100, 25, 5, 5, 5, 25, 100, 25, 5, 25, 100, 25, 5, 5, 5, 25];
   widths.forEach((px, i) => assert.strictEqual(dump.colWidths[i + 1], px, `column ${i + 1}`));
@@ -86,7 +96,8 @@ test('row heights alternate 21/5 and column widths match the hand-built grid', (
 
 test('overlaps on the same side of a day are drawn and reported', () => {
   const { cells, problems } = drawn((tabs) => tabs['Week Plan'].push(['Coffee Walk', 'Late Coffee', 'Tue', '12:30 PM', '1:30 PM', 'Weekday', '']));
-  assert.strictEqual(cells.R31.v, 'Late Coffee');
+  assert.strictEqual(cells.R29.v, 'Lunch · Late Coffee', 'the overlapping label joins the box it starts in');
+  assert.strictEqual(cells.Q33.fmt.bg, '#F9CB9C', 'its bars are still drawn through 1:30');
   assert.deepStrictEqual(problems.map((p) => `${p.tab}:${p.row} ${p.message}`), ['Week Plan:16 Late Coffee overlaps Lunch on Tue (Activities)']);
 });
 

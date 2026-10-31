@@ -65,6 +65,9 @@ class FakeSheet {
   getMaxColumns() { return this.maxCols; }
   insertRowsAfter(_, n) { this.maxRows += n; }
   insertColumnsAfter(_, n) { this.maxCols += n; }
+  deleteRows(r, n) { this.maxRows = r - 1 + Math.max(0, this.maxRows - (r - 1) - n); this.dropCells((row) => row >= r && row < r + n); }
+  deleteColumns(c, n) { this.maxCols = c - 1 + Math.max(0, this.maxCols - (c - 1) - n); this.dropCells((_, col) => col >= c && col < c + n); }
+  dropCells(test) { [...this.cells.keys()].forEach((k) => { const [r, c] = k.split(',').map(Number); if (test(r, c)) this.cells.delete(k); }); }
   getLastRow() {
     let last = 0;
     for (const [k, c] of this.cells) if ((c.v !== '' && c.v !== null && c.v !== undefined) || c.f) last = Math.max(last, +k.split(',')[0]);
@@ -101,7 +104,10 @@ class FakeSheet {
   showColumns(c, n = 1) { for (let i = 0; i < n; i++) this.hiddenCols.delete(c + i); }
   getRangeList(a1s) {
     const ranges = a1s.map((a) => this.getRange(a));
-    const list = { setBorder: (...args) => { ranges.forEach((r) => r.setBorder(...args)); return list; } };
+    const list = {
+      setBorder: (...args) => { ranges.forEach((r) => r.setBorder(...args)); return list; },
+      setWrap: (v) => { ranges.forEach((r) => r.setWrap(v)); return list; },
+    };
     return list;
   }
   hideRows(r, n = 1) { for (let i = 0; i < n; i++) this.hiddenRows.add(r + i); }
@@ -183,7 +189,13 @@ class FakeRange {
   setDataValidation(dv) { return this.each((c) => { if (dv) c.dv = plain(dv); else delete c.dv; }); }
   insertCheckboxes() { return this.each((c) => { c.dv = { kind: 'checkbox' }; c.v = false; c.f = ''; }); }
   merge() {
-    this.sheet.merges.add([this.r, this.c, this.getLastRow(), this.getLastColumn()].join(','));
+    // Like Sheets: merging across part of an existing merged range is an error
+    const [r1, c1, r2, c2] = [this.r, this.c, this.getLastRow(), this.getLastColumn()];
+    this.sheet.merges.forEach((m) => {
+      const [a1, b1, a2, b2] = m.split(',').map(Number);
+      if (m !== [r1, c1, r2, c2].join(',') && a1 <= r2 && r1 <= a2 && b1 <= c2 && c1 <= b2) throw new Error(`You must select all cells in a merged range to merge or unmerge them (${this.getA1Notation()})`);
+    });
+    this.sheet.merges.add([r1, c1, r2, c2].join(','));
     return this.each((c, i, j) => { if (i || j) { c.v = ''; c.f = ''; } });   // merging keeps only the top-left value
   }
   breakApart() {

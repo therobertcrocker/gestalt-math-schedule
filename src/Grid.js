@@ -22,9 +22,10 @@ function drawGrid_(tabName, columns, schedule) {
   const page = layoutGrid_(columns, placed.blocks);
 
   clearSheet_(sh);
-  ensureSheetSize_(sh, page.rows.length, page.nCols);
+  fitSheetSize_(sh, page.rows.length, page.nCols);
   paintRows_(sh, 1, page.rows, page.nCols);
   page.merges.forEach(([row, col, nRows, nCols]) => sh.getRange(row, col, nRows, nCols).merge());
+  drawLabelBoxes_(sh, page.boxes);
 
   // Sizes: alternating chunk/divider rows, and the fixed column pattern
   page.rows.forEach((_, i) => sh.setRowHeight(i + 1, (i % 2 === 0) ? LAYOUT.heights.chunk : LAYOUT.heights.line));
@@ -72,13 +73,17 @@ function placeItems_(columns, schedule) {
 
 // ---------------------------------------------------------------- layout
 
-/** Build the page: rows (Maps of column → cell), merges ([row, col, nRows, nCols]) and the width in columns. */
+/**
+ * Build the page: rows (Maps of column → cell), merges ([row, col, nRows, nCols]), label boxes
+ * ([{ row, col, nRows, color }]) and the width in columns.
+ */
 function layoutGrid_(columns, blocks) {
   const chunks = (TIME.dayEnd - TIME.dayStart) / TIME.chunk;
   const nRows = LAYOUT.firstChunkRow - 1 + chunks * 2 + 4;          // headers, chunks + dividers, the midnight label
   const nCols = dayColumn_(columns.length - 1, LAYOUT.dayWidth - 1);
   const rows = Array.from({ length: nRows }, () => new Map());
   const merges = [];
+  const boxes = [];
   const set = (row, col, cell) => rows[row - 1].set(col, Object.assign({}, rows[row - 1].get(col), cell));
 
   // Headers
@@ -109,10 +114,45 @@ function layoutGrid_(columns, blocks) {
       set(r, dayColumn_(b.col, cols.barLeft), { bg: b.color });
       set(r, dayColumn_(b.col, cols.barRight), { bg: b.color });
     }
-    set(top, dayColumn_(b.col, cols.label), { value: b.label, halign: 'center', line: true });
+    boxes.push({ row: top, col: dayColumn_(b.col, cols.label), nRows: bottom - top + 1, color: outlineColor_(b.color), label: b.label });
   });
 
-  return { rows, merges, nCols };
+  const kept = keepSeparateBoxes_(boxes);
+  kept.forEach(box => set(box.row, box.col, { value: box.label, halign: 'center' }));
+  return { rows, merges, boxes: kept, nCols };
+}
+
+/**
+ * Overlapping items (already reported as problems) would need overlapping merged label boxes, which Sheets
+ * refuses. A box that starts inside an earlier box in the same column is folded into it: its label joins the
+ * earlier one ("Lunch · Late Coffee") and it gets no box of its own.
+ */
+function keepSeparateBoxes_(boxes) {
+  const kept = [];
+  [...boxes].sort((a, b) => a.col - b.col || a.row - b.row).forEach(box => {
+    const host = kept.find(k => k.col === box.col && box.row >= k.row && box.row < k.row + k.nRows);
+    if (host) host.label += ' · ' + box.label;
+    else kept.push(Object.assign({}, box));
+  });
+  return kept;
+}
+
+/**
+ * Label boxes, as on the hand-built grid: each label cell is merged down the item's full length, centered and
+ * wrapped, and outlined on all four sides in a darker shade of the item's color. Outlines are set one call per
+ * color, wrapping in one call for all boxes.
+ */
+function drawLabelBoxes_(sh, boxes) {
+  if (!boxes.length) return;
+  const byColor = new Map();
+  boxes.forEach(b => {
+    if (b.nRows > 1) sh.getRange(b.row, b.col, b.nRows, 1).merge();
+    const a1 = b.nRows > 1 ? `${a1_(b.row, b.col)}:${a1_(b.row + b.nRows - 1, b.col)}` : a1_(b.row, b.col);
+    if (!byColor.has(b.color)) byColor.set(b.color, []);
+    byColor.get(b.color).push(a1);
+  });
+  byColor.forEach((ranges, color) => sh.getRangeList(ranges).setBorder(true, true, true, true, null, null, color, SpreadsheetApp.BorderStyle.SOLID_MEDIUM));
+  sh.getRangeList([].concat(...byColor.values())).setWrap(true);
 }
 
 /** Sheet column of a cell inside the d-th day (0-based), counted from the day's first column. */
