@@ -1,31 +1,40 @@
-// Checks Breakdowns.js against a copy of the real data: what gets drawn, that typed steps survive every
-// redraw, overflow flagging, unchecking/rechecking, and that a redraw of an unchanged tab changes nothing.
+// Checks Steps.js and Breakdowns.js against a copy of the real data: moving steps over from the first Breakdowns
+// layout, headings added for checked items without ever touching typed rows, and the drawn view: clock times,
+// free time, overflow, markers, per-item row sizes, multiple slots.
 'use strict';
 
 const assert = require('assert');
 const { fixture, setUp, run } = require('./helpers');
 
-/** The Breakdowns tab as it was left after the hand-built grouped layout (Daily Prep with steps A and B). */
-const LEGACY = [
-  ['Item', 'Step', 'Min', 'Time', 'End (min)'],
-  ['Daily Prep', '', '', '', ''],
-  ['', 'A', '', '0:00–0:00', 0],
-  ['', 'B', '', '0:00–0:00', 0],
+/** The live Breakdowns tab before the split: Daily Prep shown, Wake-Up parked in the hidden holding area. */
+const FIRST_LAYOUT = [
+  ['', 'Breakdowns'],
+  ['', 'Check Breakdown on the Catalog to add an item. Type steps and minutes on the left; the view redraws itself.'],
+  ['', 'Step', 'Min'],
+  ['§Daily Prep', 'Daily Prep', '15 min'],
+  ['Daily Prep', 'A', 5],
+  ['Daily Prep', 'B', 10],
+  ['Daily Prep'],
+  [],
+  ['§§', 'Hidden: items with Breakdown unchecked (steps kept)'],
+  ['§Wake-Up', 'Wake-Up'],
+  ['Wake-Up', 'Take Meds', 2],
+  ['Wake-Up', 'Brush Teeth', 5],
 ];
 
-/** Fixture tabs plus a Breakdowns tab, drawn once. */
-function drawn(breakdowns = LEGACY, change = () => {}) {
-  const tabs = fixture();
-  tabs.Breakdowns = breakdowns;
+/** Fixture tabs plus extra tabs (e.g. { Steps: rows }), with drawAll_ run once. */
+function drawn(extra = {}, change = () => {}) {
+  const tabs = Object.assign(fixture(), extra);
   change(tabs);
   const { app, book } = setUp(tabs);
-  app.drawBreakdowns_();
-  return { app, book, sh: book.getSheetByName('Breakdowns') };
+  app.drawAll_();
+  return { app, book, steps: book.getSheetByName('Steps'), view: book.getSheetByName('Breakdowns') };
 }
 
 /** All values on a sheet as plain rows, trailing blanks trimmed. */
 function rows(sh) {
   const last = sh.getLastRow();
+  if (!last) return [];
   return sh.getRange(1, 1, last, sh.getMaxColumns()).getValues().map((r) => {
     const out = [...r];
     while (out.length && out[out.length - 1] === '') out.pop();
@@ -33,10 +42,8 @@ function rows(sh) {
   });
 }
 
-/** Row number of the first row whose column A (the key) and column B match. */
-function findRow(sh, key, step) {
-  return rows(sh).findIndex((r) => (r[0] || '') === key && (r[1] || '') === step) + 1;
-}
+/** Index (0-based) of an item's title row on Breakdowns. */
+const titleAt = (r, name) => r.findIndex((row) => row[1] === name && /min$/.test(String(row[2])));
 
 /** Type values into cells the way a person would, then fire onEdit. */
 function type(app, sh, row, col, values) {
@@ -45,178 +52,137 @@ function type(app, sh, row, col, values) {
   app.onEdit({ range });
 }
 
-const steps = (app, sh) => Object.fromEntries([...app.readBreakdownSteps_(sh)].map(([k, v]) => [k, [...v].map((s) => `${s.step}:${s.min}`)]));
+/** The Steps tab as written: headings as "# Item", steps as "Step:min". */
+const stepsTab = (sh) => rows(sh).slice(1).map((r) => (r[0] && !r[1] ? `# ${r[0]}` : r.length ? `${r[1]}:${r[2]}` : ''));
 
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
 
-test('the hand-built layout is read and its steps carried over', () => {
-  const { app, sh } = drawn();
-  assert.deepStrictEqual(steps(app, sh), { 'Daily Prep': ['A:0', 'B:0'] });
+// ---------------------------------------------------------------- Steps tab
+
+test('first run: steps move from the first Breakdowns layout to Steps, including the hidden ones', () => {
+  const { steps } = drawn({ Breakdowns: FIRST_LAYOUT });
+  assert.deepStrictEqual(stepsTab(steps), ['# Daily Prep', 'A:5', 'B:10', '', '# Wake-Up', 'Take Meds:2', 'Brush Teeth:5']);
 });
 
-test('groups are ordered by start time, each with a clock-time view of its slot', () => {
-  const { sh } = drawn();
-  const r = rows(sh);
-  const titles = r.filter((row) => String(row[0]).startsWith('§') && row[0] !== '§§').map((row) => row[1]);
-  assert.deepStrictEqual(titles, ['Wake-Up', 'Daily Prep']);
-  const prep = r.find((row) => row[0] === '§Daily Prep');
-  assert.strictEqual(prep[6], '7:00 AM – 7:30 AM · Mon–Fri · 0 of 30 min');
-  const wake = r.find((row) => row[0] === '§Wake-Up');
-  assert.strictEqual(wake[6], '6:30 AM – 7:00 AM · Mon–Fri · 0 of 30 min');
+test('a checked item with no heading gets one appended; typed rows are never moved', () => {
+  const { app, book, steps } = drawn({ Steps: [['Item', 'Step', 'Min'], ['Daily Prep'], ['', 'Shower', 10]] });
+  // Wake-Up is checked in the fixture but had no heading: appended below Daily Prep
+  assert.deepStrictEqual(stepsTab(steps), ['# Daily Prep', 'Shower:10', '', '# Wake-Up']);
+  // Check Coffee Walk: its heading goes at the bottom, and nothing above changes
+  type(app, book.getSheetByName('Catalog'), 6, 6, [true]);
+  assert.deepStrictEqual(stepsTab(steps), ['# Daily Prep', 'Shower:10', '', '# Wake-Up', '', '# Coffee Walk']);
 });
 
-test('typing a step into the empty row adds it and redraws the view', () => {
-  const { app, sh } = drawn();
-  const empty = findRow(sh, 'Daily Prep', '');                          // the always-there empty step row
-  assert.ok(empty > 0);
-  // Fill in minutes for A and B, then add a third step
-  type(app, sh, findRow(sh, 'Daily Prep', 'A'), 3, [10]);
-  type(app, sh, findRow(sh, 'Daily Prep', 'B'), 3, [15]);
-  type(app, sh, findRow(sh, 'Daily Prep', ''), 2, ['Plan the day', 5]);
-  assert.deepStrictEqual(steps(app, sh), { 'Daily Prep': ['A:10', 'B:15', 'Plan the day:5'] });
+test('unchecking an item leaves its steps on Steps and only removes its group from Breakdowns', () => {
+  const { app, book, steps, view } = drawn({ Steps: [['Item', 'Step', 'Min'], ['Daily Prep'], ['', 'Shower', 10]] });
+  type(app, book.getSheetByName('Catalog'), 5, 6, [false]);           // Daily Prep's Breakdown box
+  assert.deepStrictEqual(stepsTab(steps).slice(0, 2), ['# Daily Prep', 'Shower:10']);
+  assert.strictEqual(titleAt(rows(view), 'Daily Prep'), -1);
+  assert.ok(titleAt(rows(view), 'Wake-Up') > 0);
+});
 
-  const r = rows(sh);
-  const title = r.findIndex((row) => row[0] === '§Daily Prep');
-  assert.strictEqual(r[title][2], '30 min');
-  assert.strictEqual(r[title][6], '7:00 AM – 7:30 AM · Mon–Fri · 30 of 30 min');
-  // View rows are 5 minutes each: A at 7:00, B at 7:10 (row 3), Plan the day at 7:25 (row 6)
-  assert.deepStrictEqual([r[title + 1][4], r[title + 1][6]], ['7:00 AM', 'A']);
-  assert.deepStrictEqual([r[title + 3][4], r[title + 3][6]], ['7:10 AM', 'B']);
-  assert.deepStrictEqual([r[title + 6][4], r[title + 6][6]], ['7:25 AM', 'Plan the day']);
-  assert.ok(findRow(sh, 'Daily Prep', '') > 0, 'a new empty row is always kept');
+test('steps typed one-name-per-row read the same as grouped ones', () => {
+  const { app } = drawn({ Steps: [['Item', 'Step', 'Min'], ['Daily Prep', 'Shower', 10], ['Daily Prep', 'Dress', 5]] });
+  const { steps } = app.readSchedule_();
+  assert.deepStrictEqual([...steps.get('Daily Prep')].map((s) => `${s.step}:${s.min}`), ['Shower:10', 'Dress:5']);
+});
+
+test('Steps problems: a heading not on the Catalog, and a step with no heading', () => {
+  const { app } = drawn({ Steps: [['Item', 'Step', 'Min'], ['', 'Orphan', 5], ['Nap'], ['', 'Lie down', 20]] });
+  const messages = [...app.readSchedule_().problems].map((p) => `${p.tab}:${p.row} ${p.message}`);
+  assert.deepStrictEqual(messages, ['Steps:2 Orphan: no item heading above this step', "Steps:3 Nap: isn't on the Catalog"]);
+});
+
+test('editing Steps redraws Breakdowns; editing Breakdowns or Categories does nothing', () => {
+  const { app, book, steps, view } = drawn({ Steps: [['Item', 'Step', 'Min'], ['Daily Prep'], ['', 'Shower', 10]] });
+  type(app, steps, 3, 3, [20]);
+  const r = rows(view);
+  assert.strictEqual(r[titleAt(r, 'Daily Prep')][6], '7:00 AM – 7:30 AM · Mon–Fri · 20 of 30 min');
+  let calls = 0;
+  app.drawAll_ = () => { calls++; };
+  app.onEdit({ range: view.getRange(6, 2) });
+  app.onEdit({ range: book.getSheetByName('Categories').getRange(2, 2) });
+  assert.strictEqual(calls, 0);
+});
+
+// ---------------------------------------------------------------- the view
+
+/** Draw with Daily Prep's steps set to `list` ([step, min] pairs). */
+const prep = (list) => drawn({ Steps: [['Item', 'Step', 'Min'], ['Daily Prep'], ...list.map(([s, m]) => ['', s, m])] });
+
+test('groups are ordered by start time, each titled with its slot', () => {
+  const r = rows(prep([]).view);
+  assert.ok(titleAt(r, 'Wake-Up') < titleAt(r, 'Daily Prep'));
+  assert.strictEqual(r[titleAt(r, 'Wake-Up')][6], '6:30 AM – 7:00 AM · Mon–Fri · 0 of 30 min');
+});
+
+test('steps sit at clock time, with the step list beside them', () => {
+  const r = rows(prep([['A', 10], ['B', 15], ['Plan the day', 5]]).view);
+  const t = titleAt(r, 'Daily Prep');
+  assert.deepStrictEqual([r[t][2], r[t][6]], ['30 min', '7:00 AM – 7:30 AM · Mon–Fri · 30 of 30 min']);
+  assert.deepStrictEqual([r[t + 1][1], r[t + 1][2]], ['A', 10]);
+  assert.deepStrictEqual([r[t + 1][4], r[t + 1][6]], ['7:00 AM', 'A']);
+  assert.deepStrictEqual([r[t + 3][4], r[t + 3][6]], ['7:10 AM', 'B']);
+  assert.deepStrictEqual([r[t + 6][4], r[t + 6][6]], ['7:25 AM', 'Plan the day']);
 });
 
 test('unused time in the slot is shown as free', () => {
-  const { app, sh } = drawn();
-  type(app, sh, findRow(sh, 'Daily Prep', 'A'), 3, [15]);
-  type(app, sh, findRow(sh, 'Daily Prep', 'B'), 3, [5]);
-  const r = rows(sh);
-  const title = r.findIndex((row) => row[0] === '§Daily Prep');
-  assert.deepStrictEqual([r[title + 5][4], r[title + 5][6]], ['7:20 AM', 'free · 10 min']);
+  const r = rows(prep([['A', 15], ['B', 5]]).view);
+  const t = titleAt(r, 'Daily Prep');
+  assert.deepStrictEqual([r[t + 5][4], r[t + 5][6]], ['7:20 AM', 'free · 10 min']);
 });
 
 test('a step with no minutes is a marker at its moment, sharing a row if needed', () => {
-  const { app, sh } = drawn();
-  type(app, sh, findRow(sh, 'Daily Prep', 'A'), 3, [20]);           // B stays at 0 minutes → marker at 7:20
-  type(app, sh, findRow(sh, 'Daily Prep', ''), 2, ['Meds', '']);       // another marker, also at 7:20
-  const r = rows(sh);
-  const title = r.findIndex((row) => row[0] === '§Daily Prep');
-  assert.strictEqual(r[title][6], '7:00 AM – 7:30 AM · Mon–Fri · 20 of 30 min');
-  assert.deepStrictEqual([r[title + 5][4], r[title + 5][6]], ['7:20 AM', '◆ B · ◆ Meds · free · 10 min']);
-});
-
-test('typing a step repaints only its group, and matches a full redraw exactly', () => {
-  const { app, book, sh } = drawn();
-  let full = 0;
-  const realDraw = app.drawBreakdowns_;
-  app.drawBreakdowns_ = () => { full++; realDraw(); };
-  type(app, sh, findRow(sh, 'Daily Prep', 'A'), 3, [10]);            // same height: partial
-  type(app, sh, findRow(sh, 'Daily Prep', ''), 2, ['C', 5]);           // still 6 rows tall: partial
-  assert.strictEqual(full, 0, 'no full redraws while the group keeps its height');
-  const partial = JSON.stringify(book.dump().sheets.Breakdowns);
-  realDraw();
-  assert.strictEqual(JSON.stringify(book.dump().sheets.Breakdowns), partial);
-});
-
-test('a step that makes the group taller falls back to a full redraw', () => {
-  const { app, sh } = drawn();
-  let full = 0;
-  const realDraw = app.drawBreakdowns_;
-  app.drawBreakdowns_ = () => { full++; realDraw(); };
-  ['C', 'D', 'E', 'F'].forEach((name) => type(app, sh, findRow(sh, 'Daily Prep', ''), 2, [name, 5]));   // 6 steps + empty row = 7 > 6
-  assert.ok(full >= 1);
-  assert.deepStrictEqual(steps(app, sh), { 'Daily Prep': ['A:0', 'B:0', 'C:5', 'D:5', 'E:5', 'F:5'] });
-  assert.ok(findRow(sh, 'Daily Prep', '') > 0, 'the empty row is still there');
+  const r = rows(prep([['A', 20], ['B', ''], ['Meds', '']]).view);
+  const t = titleAt(r, 'Daily Prep');
+  assert.deepStrictEqual([r[t + 5][4], r[t + 5][6]], ['7:20 AM', '◆ B · ◆ Meds · free · 10 min']);
 });
 
 test('steps past the end of the slot are flagged', () => {
-  const { app, book, sh } = drawn();
-  type(app, sh, findRow(sh, 'Daily Prep', 'A'), 3, [20]);
-  type(app, sh, findRow(sh, 'Daily Prep', 'B'), 3, [15]);
-  const r = rows(sh);
-  const title = r.findIndex((row) => row[0] === '§Daily Prep');
-  assert.strictEqual(r[title][6], '7:00 AM – 7:30 AM · Mon–Fri · 35 of 30 min');
+  const { book, view } = prep([['A', 20], ['B', 15]]);
+  const r = rows(view);
+  const t = titleAt(r, 'Daily Prep');
+  assert.strictEqual(r[t][6], '7:00 AM – 7:30 AM · Mon–Fri · 35 of 30 min');
   const cells = book.dump().sheets.Breakdowns.cells;
-  assert.strictEqual(cells[`G${title + 1}`].fmt.color, '#CC0000', 'title turns red');
-  assert.strictEqual(cells[`F${title + 1 + 7}`].fmt.bg, '#E06666', 'the 7th view row (7:30) is past the slot');
-  assert.strictEqual(cells[`F${title + 1 + 6}`].fmt.bg, '#F9CB9C', 'the 6th view row is still inside it');
+  assert.strictEqual(cells[`G${t + 1}`].fmt.color, '#CC0000', 'title turns red');
+  assert.strictEqual(cells[`F${t + 1 + 7}`].fmt.bg, '#E06666', 'the 7th view row (7:30) is past the slot');
+  assert.strictEqual(cells[`F${t + 1 + 6}`].fmt.bg, '#F9CB9C', 'the 6th view row is still inside it');
 });
 
-test('an item with View min 1 gets one row per minute, so short steps each get their own label', () => {
-  const tabs = [['Item', 'Step', 'Min'], ['Wake-Up'], ['', 'Brush teeth', 2], ['', 'Floss', 1], ['', 'Wash face', 3]];
-  const { sh } = drawn(tabs);
-  const r = rows(sh);
-  const title = r.findIndex((row) => row[0] === '§Wake-Up');
-  const body = r.slice(title + 1).filter((row) => row[0] === 'Wake-Up');
-  assert.strictEqual(body.length, 30, '30 one-minute rows for a 30-minute slot');
-  assert.deepStrictEqual([body[0][4], body[0][6]], ['6:30 AM', 'Brush teeth']);
-  assert.deepStrictEqual([body[2][4], body[2][6]], ['6:32 AM', 'Floss']);
-  assert.deepStrictEqual([body[3][4], body[3][6]], ['6:33 AM', 'Wash face']);
-  assert.deepStrictEqual([body[6][4], body[6][6]], ['6:36 AM', 'free · 24 min']);
-});
-
-test('a row inserted without a key joins the group above it', () => {
-  const { app, sh } = drawn();
-  const b = findRow(sh, 'Daily Prep', 'B');
-  sh.getRange(b, 1, 1, 3).setValues([['', 'Inserted', 5]]);           // as if typed into a blank inserted row
-  app.drawBreakdowns_();
-  assert.deepStrictEqual(steps(app, sh), { 'Daily Prep': ['A:0', 'Inserted:5'] });
-});
-
-test('unchecking keeps the steps hidden; checking again brings them back', () => {
-  const { app, book, sh } = drawn();
-  type(app, sh, findRow(sh, 'Daily Prep', 'A'), 3, [10]);
-  const catalog = book.getSheetByName('Catalog');
-  type(app, catalog, 5, 6, [false]);                                    // Daily Prep's Breakdown box
-
-  const r = rows(sh);
-  const marker = r.findIndex((row) => row[0] === '§§') + 1;
-  const hiddenTitle = r.findIndex((row) => row[0] === '§Daily Prep') + 1;
-  assert.ok(hiddenTitle > marker, 'Daily Prep now sits below the hidden marker');
-  const hiddenRows = book.dump().sheets.Breakdowns.hiddenRows;
-  assert.ok(hiddenRows.includes(marker) && hiddenRows.includes(hiddenTitle + 2), 'the holding area is hidden');
-
-  type(app, catalog, 5, 6, [true]);
-  assert.deepStrictEqual(steps(app, sh), { 'Daily Prep': ['A:10', 'B:0'] });
-  const markerNow = rows(sh).findIndex((row) => row[0] === '§§') + 1;
-  assert.ok(book.dump().sheets.Breakdowns.hiddenRows.every((n) => n >= markerNow), 'only the holding area is hidden');
-  const back = rows(sh).findIndex((row) => row[0] === '§Daily Prep') + 1;
-  assert.ok(back < rows(sh).findIndex((row) => row[0] === '§§') + 1, 'Daily Prep is back above the marker');
-});
-
-test('moving an item on the Week Plan moves its view', () => {
-  const { app, book, sh } = drawn();
-  const plan = book.getSheetByName('Week Plan');
-  type(app, plan, 3, 4, ['7:15 AM', '7:45 AM']);                       // Daily Prep row
-  const title = rows(sh).find((row) => row[0] === '§Daily Prep');
-  assert.strictEqual(title[6], '7:15 AM – 7:45 AM · Mon–Fri · 0 of 30 min');
+test('View min 1 gives one row per minute, so short steps each get their own label', () => {
+  const r = rows(drawn({ Steps: [['Item', 'Step', 'Min'], ['Wake-Up'], ['', 'Brush teeth', 2], ['', 'Floss', 1], ['', 'Wash face', 3]] }).view);
+  const t = titleAt(r, 'Wake-Up');
+  const d = titleAt(r, 'Daily Prep');
+  assert.strictEqual(d - t - 2, 30, '30 one-minute rows, then the blank row between groups');
+  assert.deepStrictEqual([r[t + 1][4], r[t + 1][6]], ['6:30 AM', 'Brush teeth']);
+  assert.deepStrictEqual([r[t + 3][4], r[t + 3][6]], ['6:32 AM', 'Floss']);
+  assert.deepStrictEqual([r[t + 4][4], r[t + 4][6]], ['6:33 AM', 'Wash face']);
+  assert.deepStrictEqual([r[t + 7][4], r[t + 7][6]], ['6:36 AM', 'free · 24 min']);
 });
 
 test('an item with two different slots gets two views side by side', () => {
-  const { sh } = drawn(LEGACY, (tabs) => tabs['Week Plan'].push(['Wake-Up', '', 'Sat-Sun', '8:00 AM', '8:30 AM', 'Weekend - Home', '']));
-  const wake = rows(sh).find((row) => row[0] === '§Wake-Up');
+  const { view } = drawn({}, (tabs) => tabs['Week Plan'].push(['Wake-Up', '', 'Sat-Sun', '8:00 AM', '8:30 AM', 'Weekend - Home', '']));
+  const r = rows(view);
+  const wake = r[titleAt(r, 'Wake-Up')];
   assert.strictEqual(wake[6], '6:30 AM – 7:00 AM · Mon–Fri · 0 of 30 min');
   assert.strictEqual(wake[11], '8:00 AM – 8:30 AM · Sat–Sun · 0 of 30 min');
 });
 
-test('redrawing an unchanged tab changes nothing', () => {
-  const { app, book, sh } = drawn();
-  type(app, sh, findRow(sh, 'Daily Prep', 'A'), 3, [10]);
-  const before = JSON.stringify(book.dump().sheets.Breakdowns);
-  app.drawBreakdowns_();
-  assert.strictEqual(JSON.stringify(book.dump().sheets.Breakdowns), before);
+test('moving an item on the Week Plan moves its view', () => {
+  const { app, book, view } = prep([]);
+  type(app, book.getSheetByName('Week Plan'), 3, 4, ['7:15 AM', '7:45 AM']);
+  const r = rows(view);
+  assert.strictEqual(r[titleAt(r, 'Daily Prep')][6], '7:15 AM – 7:45 AM · Mon–Fri · 0 of 30 min');
 });
 
-test('edits elsewhere on Breakdowns or on other tabs do not redraw', () => {
-  const { app, book } = drawn();
-  const cats = book.getSheetByName('Categories');
-  let calls = 0;
-  app.drawBreakdowns_ = () => { calls++; };
-  app.onEdit({ range: cats.getRange(2, 2) });
-  app.onEdit({ range: book.getSheetByName('Breakdowns').getRange(6, 7) });   // a view cell
-  app.onEdit({ range: book.getSheetByName('Breakdowns').getRange(1, 2) });   // the title
-  assert.strictEqual(calls, 0);
+test('Breakdowns is sized exactly to its content, and redrawing changes nothing', () => {
+  const { app, book } = prep([['A', 10]]);
+  const before = JSON.stringify(book.dump().sheets.Breakdowns);
+  const page = app.layoutBreakdowns_(app.shownGroups_(app.readSchedule_()));
+  assert.strictEqual(book.dump().sheets.Breakdowns.size[0], page.rows.length, 'no spare rows piling up');
+  app.drawAll_();
+  assert.strictEqual(JSON.stringify(book.dump().sheets.Breakdowns), before);
 });
 
 run(tests);

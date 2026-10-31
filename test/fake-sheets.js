@@ -231,6 +231,11 @@ class FakeRange {
 class FakeBook {
   constructor() { this.sheets = []; this.toasts = []; this.active = null; this.timeZone = null; }
   getSheetByName(n) { return this.sheets.find((s) => s.name === n) || null; }
+  /** "'Tab'!A2:A" → that range on that tab. */
+  getRange(a1) {
+    const m = a1.match(/^'?([^'!]+)'?!(.+)$/);
+    return this.getSheetByName(m[1]).getRange(m[2]);
+  }
   insertSheet(n) { const s = new FakeSheet(this, n); this.sheets.push(s); this.active = s; return s; }
   getActiveSheet() { return this.active; }
   setActiveSheet(s) { this.active = s; return s; }

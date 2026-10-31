@@ -1,4 +1,4 @@
-// Reading the data tabs into plain objects. Every view (grids, Breakdowns, Stats) works from these, never
+// Reading the input tabs into plain objects (Steps is read in Steps.js). Every view (grids, Breakdowns, Stats) works from these, never
 // from cell positions, so a layout change on a data tab only touches this file and Config.js.
 //
 // Anything wrong in the data (an item missing from the Catalog, End before Start, a day the grid doesn't have)
@@ -7,18 +7,21 @@
 // ---------------------------------------------------------------- whole schedule
 
 /**
- * Read every data tab. Returns { categories, catalog, plan, problems }:
- *  - categories: [{ name, min, max, notes }]           (min/max are hours per week, or null)
- *  - catalog:    Map item name → { name, side, category, color, description, breakdown, viewMinutes }
- *  - plan:       [{ row, item, label, days, start, end, grid, notes }]   (start/end in minutes)
- *  - problems:   [{ tab, row, message }]
+ * Read every input tab. Returns { categories, catalog, plan, steps, stepHeadings, problems }:
+ *  - categories:   [{ name, min, max, notes }]           (min/max are hours per week, or null)
+ *  - catalog:      Map item name → { name, side, category, color, description, breakdown, viewMinutes }
+ *  - plan:         [{ row, item, label, days, start, end, grid, notes }]   (start/end in minutes)
+ *  - steps:        Map item name → [{ step, min, row }]   (from the Steps tab; see Steps.js)
+ *  - stepHeadings: Set of item names that have a heading on Steps
+ *  - problems:     [{ tab, row, message }]
  */
 function readSchedule_() {
   const problems = [];
   const categories = readCategories_(problems);
   const catalog = readCatalog_(categories, problems);
   const plan = readPlan_(catalog, problems);
-  return { categories, catalog, plan, problems };
+  const { steps, headings } = readSteps_(catalog, problems);
+  return { categories, catalog, plan, steps, stepHeadings: headings, problems };
 }
 
 // ---------------------------------------------------------------- tabs

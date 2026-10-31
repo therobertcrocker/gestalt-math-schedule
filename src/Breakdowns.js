@@ -1,133 +1,26 @@
-// The Breakdowns tab: one group per item with Breakdown checked on the Catalog, ordered by start time.
-// On the left the user types steps and minutes; on the right the script draws a view of those steps at clock
-// time, one view per distinct time slot the item has on the Week Plan.
+// The Breakdowns tab (drawn, view only): one group per item with Breakdown checked on the Catalog, ordered by
+// start time. On the left, the item's steps as typed on the Steps tab; on the right, a view of those steps at clock
+// time, one view per distinct time slot the item has on the Week Plan, flagging steps that run past the slot.
 //
-// A full redraw starts from a blank tab, after first reading the steps already on it, so nothing typed is lost.
-// Items that get unchecked keep their steps in a hidden holding area at the bottom. Typing a step only
-// repaints that one group in place, as long as the group stays the same height.
+// Nothing here is typed by hand, so the tab is simply redrawn whole from the schedule.
 
-// ---------------------------------------------------------------- entry points
+// ---------------------------------------------------------------- entry point
 
-/**
- * Read the steps on the tab, then redraw it from the Catalog, the Week Plan and those steps. Pass `given` (from
- * readSchedule_) when drawing several tabs at once; the caller then reports problems.
- */
-function drawBreakdowns_(given) {
+/** Redraw the Breakdowns tab from `schedule` (see readSchedule_). */
+function drawBreakdowns_(schedule) {
   const ss = SpreadsheetApp.getActive();
-  const schedule = given || readSchedule_();
   const sh = ss.getSheetByName(TABS.breakdowns) || ss.insertSheet(TABS.breakdowns);
-  const saved = readBreakdownSteps_(sh);
-  const groups = breakdownGroups_(schedule, saved);
-  paintPage_(sh, layoutBreakdowns_(groups));
-  if (!given) reportProblems_(schedule.problems);
-}
-
-/**
- * A step edit on rows first..last: repaint just the group those rows belong to. Falls back to a full redraw
- * when the edit spans more than one group, lands outside a shown group, or changes the group's height.
- */
-function redrawStepEdit_(first, last) {
-  const sh = SpreadsheetApp.getActive().getSheetByName(TABS.breakdowns);
-  const group = findGroup_(sh, first);
-  if (!group || last > group.last) return drawBreakdowns_();
-
-  const schedule = readSchedule_();
-  const item = schedule.catalog.get(group.name);
-  if (!item || !item.breakdown) return drawBreakdowns_();
-
-  const steps = readBreakdownSteps_(sh).get(group.name) || [];
-  const slots = slotsFor_(group.name, schedule.plan);
-  const rows = [];
-  layoutGroup_({ item, steps, slots }, () => { const r = new Map(); rows.push(r); return r; });
-  if (rows.length !== group.last - group.title + 1) return drawBreakdowns_();
-
-  const nCols = viewColumn_(Math.max(1, slots.length) - 1, BREAKDOWNS.view.width - 1);
-  sh.getRange(group.title, 1, rows.length, nCols).setBorder(false, false, false, false, false, false);
-  paintRows_(sh, group.title, rows, nCols);
-  reportProblems_(schedule.problems);
-}
-
-/**
- * The shown group containing `row`: { name, title, last } (title row and last body row), or null when the row
- * is above the groups, on a blank spacer row, or in the hidden holding area.
- */
-function findGroup_(sh, row) {
-  const first = BREAKDOWNS.firstRow;
-  const lastRow = sh.getLastRow();
-  if (row < first || row > lastRow) return null;
-  const keys = sh.getRange(first, BREAKDOWNS.col.key, lastRow - first + 1, 1).getValues().map(r => text_(r[0]));
-  const at = i => keys[i - first];
-
-  let title = row;
-  while (title >= first && !at(title).startsWith(BREAKDOWNS.titleMark)) {
-    if (!at(title)) return null;                              // a spacer row: not inside a group
-    title--;
-  }
-  if (title < first || at(title) === BREAKDOWNS.hiddenMark) return null;
-  const name = at(title).slice(BREAKDOWNS.titleMark.length);
-  let last = title;
-  while (last + 1 <= lastRow && at(last + 1) === name) last++;
-  return row <= last ? { name, title, last } : null;
-}
-
-// ---------------------------------------------------------------- reading what's on the tab
-
-/**
- * The steps currently on the tab → Map of item name → [{ step, min }], in order.
- * A row belongs to the item named in the hidden key column. A row with a blank key (one the user inserted)
- * belongs to the group above it. A row with an item name in column A but no step is treated as a title,
- * which also reads tabs laid out by hand.
- */
-function readBreakdownSteps_(sh) {
-  const c = BREAKDOWNS.col;
-  const saved = new Map();
-  const first = BREAKDOWNS.readFrom;
-  if (sh.getLastRow() < first) return saved;
-
-  let current = null;
-  sh.getRange(first, 1, sh.getLastRow() - first + 1, c.min).getValues().forEach(v => {
-    const key = text_(v[c.key - 1]);
-    const step = text_(v[c.step - 1]);
-    const min = minutes_(v[c.min - 1]);
-    if (key === BREAKDOWNS.hiddenMark) { current = null; return; }
-    if (key.startsWith(BREAKDOWNS.titleMark)) { current = key.slice(BREAKDOWNS.titleMark.length); return; }
-    if (key && !step && min === null) { current = key; return; }   // title written by hand, or an empty step row
-    if (!step && min === null) return;
-    const item = key || current;
-    if (!item) return;
-    if (!saved.has(item)) saved.set(item, []);
-    saved.get(item).push({ step, min: min || 0 });
-  });
-  return saved;
-}
-
-/** A Min cell → whole minutes (≥ 0), or null when blank. "10", 10 and "10 min" all read as 10. */
-function minutes_(value) {
-  if (value === '' || value === null || value === undefined) return null;
-  const n = typeof value === 'number' ? value : parseFloat(String(value));
-  return Number.isFinite(n) && n >= 0 ? Math.round(n) : 0;
+  paintPage_(sh, layoutBreakdowns_(shownGroups_(schedule)));
 }
 
 // ---------------------------------------------------------------- deciding what to draw
 
-/**
- * Split items into groups to show (Breakdown checked, ordered by earliest start) and groups to keep hidden
- * (unchecked, or no longer on the Catalog, but with steps worth keeping).
- */
-function breakdownGroups_(schedule, saved) {
-  const shown = [];
-  const hidden = [];
-  schedule.catalog.forEach(item => {
-    const steps = saved.get(item.name) || [];
-    if (item.breakdown) shown.push({ item, steps, slots: slotsFor_(item.name, schedule.plan) });
-    else if (steps.length) hidden.push({ item, steps });
-  });
-  saved.forEach((steps, name) => {
-    if (!schedule.catalog.has(name) && steps.length) hidden.push({ item: { name, color: COLOR.free }, steps });
-  });
-  const firstStart = g => (g.slots.length ? g.slots[0].start : Infinity);
-  shown.sort((a, b) => firstStart(a) - firstStart(b));
-  return { shown, hidden };
+/** Items with Breakdown checked, earliest start first: [{ item, steps, slots }]. */
+function shownGroups_(schedule) {
+  return [...schedule.catalog.values()]
+    .filter(item => item.breakdown)
+    .map(item => ({ item, steps: schedule.steps.get(item.name) || [], slots: slotsFor_(item.name, schedule.plan) }))
+    .sort((a, b) => firstStart_(a.item.name, schedule.plan) - firstStart_(b.item.name, schedule.plan));
 }
 
 /**
@@ -150,64 +43,44 @@ function slotsFor_(name, plan) {
 // ---------------------------------------------------------------- layout
 
 /**
- * Turn the groups into a page: a list of rows, each a Map of column → cell, where a cell is
- * { value, bg, color, bold, line } (line = a comment line under the cell). Also returns which rows to hide
- * and how many view columns the widest group needs.
+ * Turn the groups into a page: a list of rows, each a Map of column → cell (see paintRows_), and how many view
+ * columns the widest group needs.
  */
 function layoutBreakdowns_(groups) {
+  const c = BREAKDOWNS.col;
   const rows = [];
   const add = () => { const row = new Map(); rows.push(row); return row; };
-  const viewCount = Math.max(1, ...groups.shown.map(g => Math.max(1, g.slots.length)));
+  const viewCount = Math.max(1, ...groups.map(g => Math.max(1, g.slots.length)));
 
   // Title, hint, headers
-  add().set(BREAKDOWNS.col.step, { value: 'Breakdowns', bold: true, size: 14 });
-  add().set(BREAKDOWNS.col.step, { value: 'Check Breakdown on the Catalog to add an item. Type steps and minutes on the left; the view redraws itself.', color: COLOR.muted });
+  add().set(c.step, { value: 'Breakdowns', bold: true, size: 14 });
+  add().set(c.step, { value: `Drawn from the ${TABS.steps} tab: type steps there. Check Breakdown on the ${TABS.catalog} to add an item.`, color: COLOR.muted });
   const headers = add();
-  headers.set(BREAKDOWNS.col.step, { value: 'Step', bold: true });
-  headers.set(BREAKDOWNS.col.min, { value: 'Min', bold: true, halign: 'center' });
+  headers.set(c.step, { value: 'Step', bold: true });
+  headers.set(c.min, { value: 'Min', bold: true, halign: 'center' });
 
-  groups.shown.forEach(g => {
+  groups.forEach(g => {
     layoutGroup_(g, add);
     add();                                              // blank row between groups
   });
-
-  // Hidden holding area: unchecked items keep their steps here
-  const hiddenFrom = rows.length + 1;
-  const marker = add();
-  marker.set(BREAKDOWNS.col.key, { value: BREAKDOWNS.hiddenMark });
-  marker.set(BREAKDOWNS.col.step, { value: 'Hidden: items with Breakdown unchecked (steps kept)', color: COLOR.muted });
-  groups.hidden.forEach(g => {
-    const title = add();
-    title.set(BREAKDOWNS.col.key, { value: BREAKDOWNS.titleMark + g.item.name });
-    title.set(BREAKDOWNS.col.step, { value: g.item.name, bold: true });
-    g.steps.forEach(s => {
-      const row = add();
-      row.set(BREAKDOWNS.col.key, { value: g.item.name });
-      row.set(BREAKDOWNS.col.step, { value: s.step });
-      row.set(BREAKDOWNS.col.min, { value: s.min, halign: 'center' });
-    });
-  });
-
-  return { rows, hiddenFrom, viewCount };
+  return { rows, viewCount };
 }
 
-/** One shown group: a title row, then steps on the left and one view per slot on the right, side by side. */
+/** One group: a title row, then its steps on the left and one view per slot on the right, side by side. */
 function layoutGroup_(g, add) {
   const c = BREAKDOWNS.col;
   const total = g.steps.reduce((sum, s) => sum + s.min, 0);
   const slots = g.slots.length ? g.slots : [{ start: null, end: null, days: [], grids: [] }];
   const views = slots.map(slot => viewCells_(g, slot, total));
-  const bodyRows = Math.max(g.steps.length + 1, ...views.map(v => v.body.length));   // +1: the empty step row
+  const bodyRows = Math.max(g.steps.length, ...views.map(v => v.body.length));
 
   const title = add();
-  title.set(c.key, { value: BREAKDOWNS.titleMark + g.item.name });
   title.set(c.step, { value: g.item.name, bold: true, bg: COLOR.titleBand });
   title.set(c.min, { value: `${total} min`, bg: COLOR.titleBand, halign: 'center', color: COLOR.muted });
   views.forEach((v, k) => v.title.forEach((cell, offset) => title.set(viewColumn_(k, offset), cell)));
 
   for (let i = 0; i < bodyRows; i++) {
     const row = add();
-    row.set(c.key, { value: g.item.name });                  // so a step typed into any of these rows lands here
     const s = g.steps[i];
     if (s) {
       row.set(c.step, { value: s.step });
@@ -218,8 +91,9 @@ function layoutGroup_(g, add) {
 }
 
 /**
- * The cells of one view: a title (slot and how full it is) and one body row per `viewMinutes` (default 5), each a Map of
- * column offset within the view → cell. Rows past the end of the slot are flagged; unused rows in the slot are grey.
+ * The cells of one view: a title (slot and how full it is) and one body row per `viewMinutes` (default 5), each a
+ * Map of column offset within the view → cell. Rows past the end of the slot are flagged; unused rows in the slot
+ * are grey.
  */
 function viewCells_(g, slot, total) {
   const v = BREAKDOWNS.view;
@@ -274,30 +148,25 @@ function viewColumn_(k, offset) {
 
 // ---------------------------------------------------------------- painting
 
-/** Write a laid-out page onto a blank tab, then set widths, hidden parts and frozen rows. */
+/** Write a laid-out page onto a blank tab sized exactly to it, then set widths and frozen rows. */
 function paintPage_(sh, page) {
   const c = BREAKDOWNS.col;
-  const v = BREAKDOWNS.view;
   const w = BREAKDOWNS.widths;
-  const nCols = c.firstView + page.viewCount * v.width - 1;
+  const nCols = c.firstView + page.viewCount * BREAKDOWNS.view.width - 1;
 
   clearSheet_(sh);
-  ensureSheetSize_(sh, page.rows.length + 20, nCols);
+  fitSheetSize_(sh, page.rows.length, nCols);
   paintRows_(sh, 1, page.rows, nCols);
 
-  // Column widths: key, step, min, gap, then each view
-  sh.setColumnWidth(c.key, w.key);
+  // Column widths: margin, step, min, gap, then each view
+  sh.setColumnWidth(c.margin, w.margin);
   sh.setColumnWidth(c.step, w.step);
   sh.setColumnWidth(c.min, w.min);
   sh.setColumnWidth(c.min + 1, w.gap);
   for (let k = 0; k < page.viewCount; k++) {
-    const widths = [w.time, w.bar, w.label, w.bar, w.gap];
-    widths.forEach((px, offset) => sh.setColumnWidth(viewColumn_(k, offset), px));
+    [w.time, w.bar, w.label, w.bar, w.gap].forEach((px, offset) => sh.setColumnWidth(viewColumn_(k, offset), px));
   }
-
-  sh.hideColumns(c.key);
   sh.setFrozenRows(BREAKDOWNS.firstRow - 1);
-  if (page.rows.length >= page.hiddenFrom) sh.hideRows(page.hiddenFrom, page.rows.length - page.hiddenFrom + 1);
 }
 
 // ---------------------------------------------------------------- small helpers

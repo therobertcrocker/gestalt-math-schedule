@@ -2,9 +2,11 @@
  * 🗓️ Gestalt Math – Schedule: the Apps Script behind the schedule sheet.
  *
  * What it does
- *  - The data tabs are the only place anything is typed: Categories (with optional weekly targets),
- *    Catalog (what each item is), Week Plan (when each item happens) and the steps on Breakdowns.
- *  - Everything else is drawn from them: the weekday and weekend grids, the Breakdowns views and Stats.
+ *  - The input tabs are the only place anything is typed: Categories (with optional weekly targets),
+ *    Catalog (what each item is), Week Plan (when each item happens) and Steps (routine breakdowns).
+ *  - Everything else is drawn from them: the weekday and weekend grids, Breakdowns and Stats.
+ *  - The script never redraws a cell you type in. The only thing it ever writes on an input tab is a new heading
+ *    on Steps when an item gets its Breakdown box checked.
  *
  * Conventions (same as house-tasks)
  *  - Every file in src/ shares one global scope (Apps Script has no imports), so names must be unique.
@@ -22,6 +24,7 @@ const TABS = Object.freeze({
   categories: 'Categories',
   catalog: 'Catalog',
   plan: 'Week Plan',
+  steps: 'Steps',
   breakdowns: 'Breakdowns',
   weekdays: 'Weekdays',
   weekends: 'Weekends',
@@ -71,24 +74,35 @@ const PLAN = Object.freeze({
   col: Object.freeze({ item: 1, label: 2, days: 3, start: 4, end: 5, grid: 6, notes: 7 }),
 });
 
-// ---------------------------------------------------------------- Breakdowns layout
+/**
+ * Steps: grouped breakdown steps. A heading row has the item in column A and nothing else; the rows under it are
+ * its steps (Step and Min). The script only ever appends headings for newly checked items; it never moves or
+ * clears a row here.
+ */
+const STEPS = Object.freeze({
+  firstRow: 2,
+  col: Object.freeze({ item: 1, step: 2, min: 3 }),
+  widths: Object.freeze({ item: 160, step: 260, min: 60 }),
+});
+
+/** The first Breakdowns layout (steps typed on Breakdowns itself), read once to move its steps onto Steps. */
+const LEGACY_BREAKDOWNS = Object.freeze({ readFrom: 2, titleMark: '§', hiddenMark: '§§' });
+
+// ---------------------------------------------------------------- Breakdowns layout (drawn, view only)
 
 /**
- * Breakdowns tab. Rows 1–3 are the title, a hint and column headers; groups start below.
- * Left: a hidden key column (which item each row belongs to), then Step and Min, which the user types.
- * Right: one view per distinct time slot of the item, each `view.width` columns wide, drawn by the script.
+ * Breakdowns tab. Rows 1–3 are the title, a hint and column headers; groups start below, one per item with
+ * Breakdown checked, ordered by start time. Left: the item's steps (read-only copy of Steps). Right: one view per
+ * distinct time slot of the item, each `view.width` columns wide.
  */
 const BREAKDOWNS = Object.freeze({
-  firstRow: 4,                            // first group row of a drawn tab
-  readFrom: 2,                            // where reading steps starts: also picks up older hand-built layouts
+  firstRow: 4,
   minutesPerRow: 5,                       // default minutes per view row (Catalog "View min" overrides per item)
   marker: '◆ ',                           // prefix for a step with no minutes (a moment, not a span)
-  titleMark: '§',                         // key-column prefix on a group's title row
-  hiddenMark: '§§',                       // key-column value on the row that starts the hidden holding area
-  col: Object.freeze({ key: 1, step: 2, min: 3, firstView: 5 }),
+  col: Object.freeze({ margin: 1, step: 2, min: 3, firstView: 5 }),
   // Inside one view, columns counted from its first: time · bar · label · bar · gap
   view: Object.freeze({ time: 0, barLeft: 1, label: 2, barRight: 3, width: 5 }),
-  widths: Object.freeze({ key: 20, step: 220, min: 50, gap: 24, time: 70, bar: 14, label: 190 }),
+  widths: Object.freeze({ margin: 20, step: 220, min: 50, gap: 24, time: 70, bar: 14, label: 190 }),
 });
 
 // ---------------------------------------------------------------- grid layout (Weekdays / Weekends)
@@ -136,7 +150,7 @@ const WEEKEND_COLUMNS = Object.freeze([
 const COLOR = Object.freeze({
   text: '#000000',
   muted: '#666666',
-  titleBand: '#F3F3F3',      // group title rows
+  titleBand: '#F3F3F3',      // group title rows; Steps heading rows
   free: '#EFEFEF',           // view rows inside the slot with no step
   over: '#E06666',           // view rows past the end of the slot
   overText: '#CC0000',

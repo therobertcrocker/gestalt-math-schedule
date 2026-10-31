@@ -6,7 +6,6 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('🗓️ Schedule')
     .addItem('🔄 Refresh everything', 'refreshAll')
-    .addItem('🔄 Refresh breakdowns', 'refreshBreakdowns')
     .addToUi();
 }
 
@@ -15,30 +14,28 @@ function refreshAll() {
   withLock_(drawAll_);
 }
 
-/** Menu: redraw the Breakdowns tab. */
-function refreshBreakdowns() {
-  withLock_(() => drawBreakdowns_());
-}
-
-/** Read the data once, draw every drawn tab from it, then report all problems together. */
-function drawAll_() {
-  const schedule = readSchedule_();
-  drawBreakdowns_(schedule);
-  const gridProblems = [...drawWeekdays_(schedule), ...drawWeekends_(schedule)];
-  reportProblems_([...schedule.problems, ...gridProblems]);
-}
-
 /**
- * Simple trigger: redraws what an edit affects. A step or minute typed on Breakdowns repaints just that group;
- * any Catalog or Week Plan edit redraws every drawn tab.
+ * Simple trigger: an edit on any input tab (Catalog, Week Plan, Steps) redraws the drawn tabs. Edits on the drawn
+ * tabs themselves, or on Categories (nothing drawn uses it yet), do nothing.
  */
 function onEdit(e) {
   if (!e || !e.range) return;
-  const r = e.range;
-  const tab = r.getSheet().getName();
-  const onSteps = tab === TABS.breakdowns && r.getColumn() <= BREAKDOWNS.col.min && r.getLastRow() >= BREAKDOWNS.firstRow;
-  if (onSteps) withLock_(() => redrawStepEdit_(r.getRow(), r.getLastRow()));
-  else if (tab === TABS.catalog || tab === TABS.plan) withLock_(drawAll_);
+  const tab = e.range.getSheet().getName();
+  if ([TABS.catalog, TABS.plan, TABS.steps].includes(tab)) withLock_(drawAll_);
+}
+
+/**
+ * Read the input tabs once, add Steps headings for newly checked items, draw every drawn tab from that one read,
+ * then report all problems together. Creates the Steps tab the first time (moving over steps from the first
+ * Breakdowns layout).
+ */
+function drawAll_() {
+  ensureStepsTab_();
+  const schedule = readSchedule_();
+  addMissingStepHeadings_(schedule);
+  drawBreakdowns_(schedule);
+  const gridProblems = [...drawWeekdays_(schedule), ...drawWeekends_(schedule)];
+  reportProblems_([...schedule.problems, ...gridProblems]);
 }
 
 /** Run fn while holding the document lock, so two redraws never overlap. */
