@@ -74,6 +74,7 @@ const BREAKDOWNS = Object.freeze({
   firstRow: 4,                            // first group row of a drawn tab
   readFrom: 2,                            // where reading steps starts: also picks up older hand-built layouts
   minutesPerRow: 5,                       // each view row is 5 minutes
+  marker: '◆ ',                           // prefix for a step with no minutes (a moment, not a span)
   titleMark: '§',                         // key-column prefix on a group's title row
   hiddenMark: '§§',                       // key-column value on the row that starts the hidden holding area
   col: Object.freeze({ key: 1, step: 2, min: 3, firstView: 5 }),

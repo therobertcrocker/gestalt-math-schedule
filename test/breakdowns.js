@@ -89,10 +89,45 @@ test('typing a step into the empty row adds it and redraws the view', () => {
 
 test('unused time in the slot is shown as free', () => {
   const { app, sh } = drawn();
-  type(app, sh, findRow(sh, 'Daily Prep', 'A'), 3, [20]);
+  type(app, sh, findRow(sh, 'Daily Prep', 'A'), 3, [15]);
+  type(app, sh, findRow(sh, 'Daily Prep', 'B'), 3, [5]);
   const r = rows(sh);
   const title = r.findIndex((row) => row[0] === '§Daily Prep');
   assert.deepStrictEqual([r[title + 5][4], r[title + 5][6]], ['7:20 AM', 'free · 10 min']);
+});
+
+test('a step with no minutes is a marker at its moment, sharing a row if needed', () => {
+  const { app, sh } = drawn();
+  type(app, sh, findRow(sh, 'Daily Prep', 'A'), 3, [20]);           // B stays at 0 minutes → marker at 7:20
+  type(app, sh, findRow(sh, 'Daily Prep', ''), 2, ['Meds', '']);       // another marker, also at 7:20
+  const r = rows(sh);
+  const title = r.findIndex((row) => row[0] === '§Daily Prep');
+  assert.strictEqual(r[title][6], '7:00 AM – 7:30 AM · Mon–Fri · 20 of 30 min');
+  assert.deepStrictEqual([r[title + 5][4], r[title + 5][6]], ['7:20 AM', '◆ B · ◆ Meds · free · 10 min']);
+});
+
+test('typing a step repaints only its group, and matches a full redraw exactly', () => {
+  const { app, book, sh } = drawn();
+  let full = 0;
+  const realDraw = app.drawBreakdowns_;
+  app.drawBreakdowns_ = () => { full++; realDraw(); };
+  type(app, sh, findRow(sh, 'Daily Prep', 'A'), 3, [10]);            // same height: partial
+  type(app, sh, findRow(sh, 'Daily Prep', ''), 2, ['C', 5]);           // still 6 rows tall: partial
+  assert.strictEqual(full, 0, 'no full redraws while the group keeps its height');
+  const partial = JSON.stringify(book.dump().sheets.Breakdowns);
+  realDraw();
+  assert.strictEqual(JSON.stringify(book.dump().sheets.Breakdowns), partial);
+});
+
+test('a step that makes the group taller falls back to a full redraw', () => {
+  const { app, sh } = drawn();
+  let full = 0;
+  const realDraw = app.drawBreakdowns_;
+  app.drawBreakdowns_ = () => { full++; realDraw(); };
+  ['C', 'D', 'E', 'F'].forEach((name) => type(app, sh, findRow(sh, 'Daily Prep', ''), 2, [name, 5]));   // 6 steps + empty row = 7 > 6
+  assert.ok(full >= 1);
+  assert.deepStrictEqual(steps(app, sh), { 'Daily Prep': ['A:0', 'B:0', 'C:5', 'D:5', 'E:5', 'F:5'] });
+  assert.ok(findRow(sh, 'Daily Prep', '') > 0, 'the empty row is still there');
 });
 
 test('steps past the end of the slot are flagged', () => {

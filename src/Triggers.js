@@ -15,14 +15,16 @@ function refreshBreakdowns() {
 }
 
 /**
- * Simple trigger: redraws Breakdowns when something it shows changes — a step or minute typed on Breakdowns,
- * any Catalog edit (checkbox, name, color), or any Week Plan edit (an item's time slot).
+ * Simple trigger: redraws Breakdowns when something it shows changes. A step or minute typed on Breakdowns
+ * repaints just that group; any Catalog edit (checkbox, name, color) or Week Plan edit redraws the whole tab.
  */
 function onEdit(e) {
   if (!e || !e.range) return;
-  const tab = e.range.getSheet().getName();
-  const onSteps = tab === TABS.breakdowns && e.range.getColumn() <= BREAKDOWNS.col.min && e.range.getLastRow() >= BREAKDOWNS.firstRow;
-  if (onSteps || tab === TABS.catalog || tab === TABS.plan) withLock_(drawBreakdowns_);
+  const r = e.range;
+  const tab = r.getSheet().getName();
+  const onSteps = tab === TABS.breakdowns && r.getColumn() <= BREAKDOWNS.col.min && r.getLastRow() >= BREAKDOWNS.firstRow;
+  if (onSteps) withLock_(() => redrawStepEdit_(r.getRow(), r.getLastRow()));
+  else if (tab === TABS.catalog || tab === TABS.plan) withLock_(drawBreakdowns_);
 }
 
 /** Run fn while holding the document lock, so two redraws never overlap. */

@@ -99,6 +99,11 @@ class FakeSheet {
   setColumnWidths(c, n, w) { for (let i = 0; i < n; i++) this.colWidths.set(c + i, w); }
   hideColumns(c, n = 1) { for (let i = 0; i < n; i++) this.hiddenCols.add(c + i); }
   showColumns(c, n = 1) { for (let i = 0; i < n; i++) this.hiddenCols.delete(c + i); }
+  getRangeList(a1s) {
+    const ranges = a1s.map((a) => this.getRange(a));
+    const list = { setBorder: (...args) => { ranges.forEach((r) => r.setBorder(...args)); return list; } };
+    return list;
+  }
   hideRows(r, n = 1) { for (let i = 0; i < n; i++) this.hiddenRows.add(r + i); }
   showRows(r, n = 1) { for (let i = 0; i < n; i++) this.hiddenRows.delete(r + i); }
   setFrozenRows(n) { this.frozenRows = n; }
@@ -204,7 +209,10 @@ class FakeRange {
   setWrap(v) { return this.fmt('wrap', v); }
   setNumberFormat(v) { return this.fmt('numfmt', v); }
   setTextRotation(v) { return this.fmt('rotation', v); }
-  setBorder(...args) { return this.fmt('border', args.map(plain)); }
+  setBorder(...args) {
+    if (args.slice(0, 6).every((a) => a === false)) return this.each((c) => { delete c.fmt.border; });   // clears borders
+    return this.fmt('border', args.map(plain));
+  }
 }
 
 class FakeBook {

@@ -2,10 +2,11 @@
 // On the left the user types steps and minutes; on the right the script draws a view of those steps at clock
 // time, one view per distinct time slot the item has on the Week Plan.
 //
-// The tab is redrawn from scratch every time, after first reading the steps already on it, so nothing typed
-// is lost. Items that get unchecked keep their steps in a hidden holding area at the bottom.
+// A full redraw starts from a blank tab, after first reading the steps already on it, so nothing typed is lost.
+// Items that get unchecked keep their steps in a hidden holding area at the bottom. Typing a step only
+// repaints that one group in place, as long as the group stays the same height.
 
-// ---------------------------------------------------------------- entry point
+// ---------------------------------------------------------------- entry points
 
 /** Read the steps on the tab, then redraw it from the Catalog, the Week Plan and those steps. */
 function drawBreakdowns_() {
@@ -16,6 +17,54 @@ function drawBreakdowns_() {
   const groups = breakdownGroups_(schedule, saved);
   paintPage_(sh, layoutBreakdowns_(groups));
   reportProblems_(schedule.problems);
+}
+
+/**
+ * A step edit on rows first..last: repaint just the group those rows belong to. Falls back to a full redraw
+ * when the edit spans more than one group, lands outside a shown group, or changes the group's height.
+ */
+function redrawStepEdit_(first, last) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(TABS.breakdowns);
+  const group = findGroup_(sh, first);
+  if (!group || last > group.last) return drawBreakdowns_();
+
+  const schedule = readSchedule_();
+  const item = schedule.catalog.get(group.name);
+  if (!item || !item.breakdown) return drawBreakdowns_();
+
+  const steps = readBreakdownSteps_(sh).get(group.name) || [];
+  const slots = slotsFor_(group.name, schedule.plan);
+  const rows = [];
+  layoutGroup_({ item, steps, slots }, () => { const r = new Map(); rows.push(r); return r; });
+  if (rows.length !== group.last - group.title + 1) return drawBreakdowns_();
+
+  const nCols = viewColumn_(Math.max(1, slots.length) - 1, BREAKDOWNS.view.width - 1);
+  sh.getRange(group.title, 1, rows.length, nCols).setBorder(false, false, false, false, false, false);
+  paintRows_(sh, group.title, rows, nCols);
+  reportProblems_(schedule.problems);
+}
+
+/**
+ * The shown group containing `row`: { name, title, last } (title row and last body row), or null when the row
+ * is above the groups, on a blank spacer row, or in the hidden holding area.
+ */
+function findGroup_(sh, row) {
+  const first = BREAKDOWNS.firstRow;
+  const lastRow = sh.getLastRow();
+  if (row < first || row > lastRow) return null;
+  const keys = sh.getRange(first, BREAKDOWNS.col.key, lastRow - first + 1, 1).getValues().map(r => text_(r[0]));
+  const at = i => keys[i - first];
+
+  let title = row;
+  while (title >= first && !at(title).startsWith(BREAKDOWNS.titleMark)) {
+    if (!at(title)) return null;                              // a spacer row: not inside a group
+    title--;
+  }
+  if (title < first || at(title) === BREAKDOWNS.hiddenMark) return null;
+  const name = at(title).slice(BREAKDOWNS.titleMark.length);
+  let last = title;
+  while (last + 1 <= lastRow && at(last + 1) === name) last++;
+  return row <= last ? { name, title, last } : null;
 }
 
 // ---------------------------------------------------------------- reading what's on the tab
@@ -184,12 +233,14 @@ function viewCells_(g, slot, total) {
   title.set(v.label, { value: `${when} · ${fill}`, bold: true, bg: COLOR.titleBand, color: total > length ? COLOR.overText : COLOR.text });
   title.set(v.barRight, { value: '', bg: g.item.color });
 
-  // Where each step starts, in minutes from the start of the slot
+  // Where each step starts, in minutes from the start of the slot. A step with no minutes is a marker:
+  // it's labeled at the moment it happens but takes up no time.
   const starts = [];
   let at = 0;
-  g.steps.forEach(s => { if (s.min > 0) { starts.push({ at, step: s }); at += s.min; } });
+  g.steps.forEach(s => { starts.push({ at, step: s }); at += s.min; });
 
-  const rows = Math.ceil(Math.max(length, total) / step);
+  const lastMarker = Math.max(-1, ...starts.map(s => s.at));
+  const rows = Math.max(Math.ceil(Math.max(length, total) / step), Math.floor(lastMarker / step) + 1);
   const body = [];
   for (let i = 0; i < rows; i++) {
     const offset = i * step;
@@ -197,13 +248,16 @@ function viewCells_(g, slot, total) {
     const used = offset < total;
     const bar = over ? COLOR.over : used ? g.item.color : COLOR.free;
     const row = new Map([[v.barLeft, { value: '', bg: bar }], [v.barRight, { value: '', bg: bar }]]);
-    const begins = starts.find(s => s.at >= offset && s.at < offset + step);
-    if (begins) {
-      row.set(v.time, { value: clock(begins.at), color: over ? COLOR.overText : COLOR.muted, halign: 'right' });
-      row.set(v.label, { value: begins.step.step, color: over ? COLOR.overText : COLOR.text, line: true });
-    } else if (!used && offset === Math.ceil(total / step) * step && !over) {
-      row.set(v.time, { value: clock(total), color: COLOR.muted, halign: 'right' });
-      row.set(v.label, { value: `free · ${length - total} min`, color: COLOR.muted, line: true });
+    const begins = starts.filter(s => s.at >= offset && s.at < offset + step);
+    const freeStarts = !used && !over && length > total && offset === Math.ceil(total / step) * step;
+    // Steps starting inside the same 5 minutes share one label ("Meds · Shower"); free time joins it too
+    const parts = begins.map(s => (s.step.min > 0 ? s.step.step : BREAKDOWNS.marker + s.step.step));
+    if (freeStarts) parts.push(`free · ${length - total} min`);
+    if (parts.length) {
+      const when = begins.length ? begins[0].at : total;
+      const color = over ? COLOR.overText : begins.length ? COLOR.text : COLOR.muted;
+      row.set(v.time, { value: clock(when), color: over ? COLOR.overText : COLOR.muted, halign: 'right' });
+      row.set(v.label, { value: parts.join(' · '), color, line: true });
     }
     body.push(row);
   }
@@ -217,31 +271,16 @@ function viewColumn_(k, offset) {
 
 // ---------------------------------------------------------------- painting
 
-/** Write a laid-out page onto the tab in a few batched calls. */
+/** Write a laid-out page onto a blank tab, then set widths, hidden parts and frozen rows. */
 function paintPage_(sh, page) {
   const c = BREAKDOWNS.col;
   const v = BREAKDOWNS.view;
   const w = BREAKDOWNS.widths;
-  const nRows = Math.max(page.rows.length, 1);
   const nCols = c.firstView + page.viewCount * v.width - 1;
 
   clearSheet_(sh);
-  ensureSheetSize_(sh, nRows + 20, nCols);
-
-  const grid = (fn) => page.rows.map(row => Array.from({ length: nCols }, (_, j) => fn(row.get(j + 1))));
-  const range = sh.getRange(1, 1, page.rows.length, nCols);
-  range.setValues(grid(cell => (cell && cell.value !== undefined ? cell.value : '')));
-  range.setBackgrounds(grid(cell => (cell && cell.bg) || COLOR.white));
-  range.setFontColors(grid(cell => (cell && cell.color) || COLOR.text));
-  range.setFontWeights(grid(cell => (cell && cell.bold ? 'bold' : 'normal')));
-  range.setHorizontalAlignments(grid(cell => (cell && cell.halign) || 'left'));
-  range.setVerticalAlignment('middle');
-
-  // Comment lines under step labels, and the big title
-  page.rows.forEach((row, i) => row.forEach((cell, col) => {
-    if (cell.line) sh.getRange(i + 1, col).setBorder(null, null, true, null, null, null, COLOR.line, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
-    if (cell.size) sh.getRange(i + 1, col).setFontSize(cell.size);
-  }));
+  ensureSheetSize_(sh, page.rows.length + 20, nCols);
+  paintRows_(sh, 1, page.rows, nCols);
 
   // Column widths: key, step, min, gap, then each view
   sh.setColumnWidth(c.key, w.key);
@@ -256,6 +295,32 @@ function paintPage_(sh, page) {
   sh.hideColumns(c.key);
   sh.setFrozenRows(BREAKDOWNS.firstRow - 1);
   if (page.rows.length >= page.hiddenFrom) sh.hideRows(page.hiddenFrom, page.rows.length - page.hiddenFrom + 1);
+}
+
+/**
+ * Write laid-out rows (each a Map of column → cell) starting at `firstRow`, nCols wide, in a handful of batched
+ * calls: values and formats as whole grids, then all comment lines and font sizes as one range list each.
+ */
+function paintRows_(sh, firstRow, rows, nCols) {
+  if (!rows.length) return;
+  const grid = fn => rows.map(row => Array.from({ length: nCols }, (_, j) => fn(row.get(j + 1))));
+  const range = sh.getRange(firstRow, 1, rows.length, nCols);
+  range.setValues(grid(cell => (cell && cell.value !== undefined ? cell.value : '')));
+  range.setBackgrounds(grid(cell => (cell && cell.bg) || COLOR.white));
+  range.setFontColors(grid(cell => (cell && cell.color) || COLOR.text));
+  range.setFontWeights(grid(cell => (cell && cell.bold ? 'bold' : 'normal')));
+  range.setHorizontalAlignments(grid(cell => (cell && cell.halign) || 'left'));
+  range.setVerticalAlignment('middle');
+
+  const lines = [];
+  const sized = new Map();
+  rows.forEach((row, i) => row.forEach((cell, col) => {
+    const a1 = sh.getRange(firstRow + i, col).getA1Notation();
+    if (cell.line) lines.push(a1);
+    if (cell.size) sized.set(a1, cell.size);
+  }));
+  if (lines.length) sh.getRangeList(lines).setBorder(null, null, true, null, null, null, COLOR.line, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  sized.forEach((size, a1) => sh.getRange(a1).setFontSize(size));
 }
 
 // ---------------------------------------------------------------- small helpers
