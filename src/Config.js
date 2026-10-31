@@ -28,6 +28,7 @@ const TABS = Object.freeze({
   breakdowns: 'Breakdowns',
   weekdays: 'Weekdays',
   weekends: 'Weekends',
+  stats: 'Stats',
 });
 
 /** Full day names for grid headers. */
@@ -150,6 +151,21 @@ const WEEKEND_COLUMNS = Object.freeze([
   ...GRIDS['Weekend - Travel'].map(day => Object.freeze({ day, grid: 'Weekend - Travel', title: `${DAY_NAMES[day]} · Travel` })),
 ]);
 
+// ---------------------------------------------------------------- Stats
+
+/**
+ * Stats tab: Weekday hours (Mon–Fri) per category. Where an Activity overlaps a Schedule block, the Activity gets that
+ * time, so every minute counts once. Items with no category count as "Not counted"; minutes with nothing on either
+ * side, from 6 AM to midnight, are "Open time". Touchstones and weekend rows aren't counted.
+ */
+const STATS = Object.freeze({
+  grid: 'Weekday',
+  uncounted: 'Not counted',
+  open: 'Open time',
+  col: Object.freeze({ label: 1, first: 2 }),
+  widths: Object.freeze({ label: 190, number: 80 }),
+});
+
 // ---------------------------------------------------------------- problems on the input tabs
 
 /**
@@ -175,5 +191,8 @@ const COLOR = Object.freeze({
   white: '#FFFFFF',
   separator: '#434343',      // dark column between days on the grids
   problem: '#F4CCCC',        // column-A highlight on input rows with a problem
+  statusOn: '#38761D',       // Stats target status: on target, under, over
+  statusUnder: '#B45F06',
+  statusOver: '#CC0000',
   problemText: '#CC0000',    // the ⚠ Check column
 });

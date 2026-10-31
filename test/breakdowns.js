@@ -102,7 +102,7 @@ test('Steps problems: a heading not on the Catalog, and a step with no heading',
   assert.deepStrictEqual(messages, ['Steps:2 Orphan: no item heading above this step', "Steps:3 Nap: isn't on the Catalog"]);
 });
 
-test('editing Steps redraws Breakdowns; editing Breakdowns or Categories does nothing', () => {
+test('editing Steps redraws Breakdowns; editing Breakdowns itself does nothing', () => {
   const { app, book, steps, view } = drawn({ Steps: [['Item', 'Step', 'Min'], ['Daily Prep'], ['', 'Shower', 10]] });
   type(app, steps, 3, 3, [20]);
   const r = rows(view);
@@ -110,7 +110,6 @@ test('editing Steps redraws Breakdowns; editing Breakdowns or Categories does no
   let calls = 0;
   app.drawAll_ = () => { calls++; };
   app.onEdit({ range: view.getRange(6, 4) });
-  app.onEdit({ range: book.getSheetByName('Categories').getRange(2, 2) });
   assert.strictEqual(calls, 0);
 });
 

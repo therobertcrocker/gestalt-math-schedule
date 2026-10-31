@@ -35,14 +35,14 @@ function refreshAll() {
 }
 
 /**
- * Simple trigger: an edit on any input tab (Catalog, Week Plan, Steps) redraws the drawn tabs. Renaming an item on
- * the Catalog first carries the new name to the Week Plan and Steps. Edits on the drawn tabs themselves, or on
- * Categories (nothing drawn uses it yet), do nothing.
+ * Simple trigger: an edit on any input tab (Categories, Catalog, Week Plan, Steps) redraws the drawn tabs whose
+ * content changes. Renaming an item on the Catalog first carries the new name to the Week Plan and Steps. Edits on
+ * the drawn tabs themselves do nothing.
  */
 function onEdit(e) {
   if (!e || !e.range) return;
   const tab = e.range.getSheet().getName();
-  if (![TABS.catalog, TABS.plan, TABS.steps].includes(tab)) return;
+  if (![TABS.categories, TABS.catalog, TABS.plan, TABS.steps].includes(tab)) return;
   withLock_(() => {
     if (tab === TABS.catalog) carryRename_(e);
     drawAll_(false);
@@ -60,6 +60,7 @@ function drawAll_(force) {
   addMissingStepHeadings_(schedule);
   drawBreakdowns_(schedule, force);
   const gridProblems = [...drawWeekdays_(schedule, force), ...drawWeekends_(schedule, force)];
+  drawStats_(schedule, force);
   const problems = [...schedule.problems, ...gridProblems];
   reportProblems_(problems);
   return problems;

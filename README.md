@@ -19,7 +19,7 @@ type in (its only write to an input tab is adding a heading on Steps when you ch
 | Breakdowns | no | One group per checked item, by start time: its steps at clock time in its Week Plan slot, flagging steps that run over |
 | Weekdays | no | Mon–Fri, drawn from the Week Plan in the original grid's layout (30-minute chunks, 10 columns per day) |
 | Weekends | no | Home Sat–Sun and Travel Fri–Sun side by side, same layout as Weekdays. Week Plan Grid = `Weekend - Home` / `Weekend - Travel` |
-| Stats | no | Hours per category against targets *(coming)* |
+| Stats | no | Weekday (Mon–Fri) hours per category against Categories targets, hours per day, and open time per day |
 
 ## Where things are
 
@@ -33,13 +33,14 @@ any other directly, and names must be unique across all files.
 | `Steps.js` | The Steps tab: reading grouped steps, adding headings for newly checked items, the one-time move from the first Breakdowns layout |
 | `Breakdowns.js` | The Breakdowns tab (view only): one group per checked item, the clock-time views |
 | `Grid.js` | The week grids (Weekdays, Weekends): placing Week Plan rows into 30-minute chunks, overlap checks, label boxes |
+| `Stats.js` | The Stats tab: counting each weekday minute by minute, target statuses, the three tables |
 | `Rename.js` | Carrying a Catalog rename to the Week Plan and Steps |
 | `Triggers.js` | Entry points: the 🗓️ Schedule menu, `onEdit` auto-redraw, the document lock |
 | `Drawing.js` | Helpers every drawn tab uses: clearing a sheet, the batched row painter, fingerprints for skipping unchanged tabs, reporting data problems |
 
 ### Input tabs vs drawn tabs
 
-Inputs: Categories, Catalog, Week Plan, Steps. Drawn: Breakdowns, Weekdays, Weekends (and Stats, coming). Editing an
+Inputs: Categories, Catalog, Week Plan, Steps. Drawn: Breakdowns, Weekdays, Weekends, Stats. Editing an
 input tab redraws only the drawn tabs whose content would change: each drawn tab keeps a fingerprint of the page it
 last drew (in the document's properties) and is skipped when the new page matches, and row heights and column widths
 are only set when a tab's shape changes. **🗓️ Schedule → 🔄 Refresh everything** redraws every tab from scratch.
@@ -53,6 +54,13 @@ home. Its Week Plan rows need only a Start. The grids draw a line in the item's 
 hour, with a note naming it (the Week Plan label, or the item name). When it happens on every day of its grid, one
 line runs across the whole grid from the hour labels, with the note on the hour label; otherwise each day gets its
 own line. Touchstones don't count toward Stats and don't get breakdowns.
+
+### How Stats counts
+
+Each weekday is laid out minute by minute from 6 AM to midnight: Schedule blocks first, then Activities on top, so an
+Activity takes the time of any block it overlaps (Wednesday's EMDR takes an hour of the Mid-Morning Block) and every
+minute counts once. Items with no category count as **Not counted**; minutes with nothing on either side are
+**Open time**. Touchstones and weekend rows aren't counted. Targets are the Min/Max hours on Categories.
 
 ### Renaming an item
 
@@ -95,6 +103,7 @@ computer. `test/fixtures/schedule.json` is a copy of the real data tabs.
   from scratch, and Refresh everything always redraws.
 - `test/problems.js`: problems land in each tab's ⚠ Check column and clear when fixed; Check data lists them all.
 - `test/rename.js`: a Catalog rename reaches the Week Plan and Steps, but never merges two items.
+- `test/stats.js`: hours per category and per day from the real Week Plan, open time, target statuses.
 
 ## Checking a refactor: `npm run compare`
 
