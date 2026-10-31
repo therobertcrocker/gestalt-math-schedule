@@ -111,7 +111,7 @@ test('weekend rows stay off the weekday grid', () => {
   assert.ok(!Object.values(cells).some((c) => c.v === 'Sat coffee'));
 });
 
-test('a Week Plan edit redraws both drawn tabs', () => {
+test('a Week Plan edit redraws every drawn tab', () => {
   const tabs = fixture();
   tabs.Breakdowns = [['Item', 'Step', 'Min']];
   const { app, book } = setUp(tabs);
@@ -122,6 +122,42 @@ test('a Week Plan edit redraws both drawn tabs', () => {
   const cells = book.dump().sheets.Weekdays.cells;
   assert.strictEqual(cells.H61.v, 'D&D');
   assert.ok(book.getSheetByName('Breakdowns'), 'Breakdowns drawn too');
+  assert.ok(book.getSheetByName('Weekends'), 'Weekends drawn too');
+});
+
+// ---------------------------------------------------------------- Weekends
+
+/** Draw Weekends with a few weekend rows added to the real data. */
+function weekends() {
+  const tabs = fixture();
+  tabs['Week Plan'].push(
+    ['Wake-Up', '', 'Sat-Sun', '8:00 AM', '8:30 AM', 'Weekend - Home', ''],
+    ['Block', 'Event', 'Fri', '6:00 PM', '11:00 PM', 'Weekend - Travel', ''],
+    ['Coffee Walk', '', 'Sat', '10:00 AM', '10:30 AM', 'Weekend - Travel', ''],
+  );
+  const { app, book } = setUp(tabs);
+  const problems = [...app.drawWeekends_(app.readSchedule_())];
+  return { problems, dump: book.dump().sheets.Weekends, schedule: app.readSchedule_() };
+}
+
+test('Weekends: home Sat–Sun then travel Fri–Sun, side by side', () => {
+  const { dump, problems, schedule } = weekends();
+  assert.deepStrictEqual([...schedule.problems], [], 'travel Friday is allowed');
+  assert.deepStrictEqual(problems, []);
+  const c = dump.cells;
+  assert.deepStrictEqual(['C1', 'M1', 'W1', 'AG1', 'AQ1'].map((a) => c[a].v),
+    ['Saturday · Home', 'Sunday · Home', 'Friday · Travel', 'Saturday · Travel', 'Sunday · Travel']);
+  assert.deepStrictEqual(labels(c), {
+    'Wake-Up': ['D13', 'N13'],              // 8:00 AM on both home days
+    'Event': ['X53'],                        // travel Friday 6 PM
+    'Coffee Walk': ['AL21'],                 // travel Saturday 10 AM
+  });
+  assert.deepStrictEqual(dump.size, [80, 52]);
+});
+
+test('weekday rows stay off Weekends, and weekend rows stay off Weekdays', () => {
+  const { dump } = weekends();
+  assert.ok(!Object.values(dump.cells).some((cell) => cell.v === 'Early Morning Block'));
 });
 
 run(tests);

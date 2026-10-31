@@ -1,4 +1,4 @@
-// The week grids: Weekdays now, Weekends later. Each day is drawn from the Week Plan in the layout of the original
+// The week grids: Weekdays (Mon–Fri) and Weekends (home Sat–Sun, travel Fri–Sun). Each day is drawn from the Week Plan in the layout of the original
 // hand-built Schedule Planning tab: Schedule and Activities side by side, 30-minute chunks separated by thin
 // divider rows, colored bars on both sides of each item, and the item's label with a comment line at its start.
 //
@@ -9,6 +9,11 @@
 /** Draw the Weekdays tab. Returns any overlap problems found, for the caller to report. */
 function drawWeekdays_(schedule) {
   return drawGrid_(TABS.weekdays, WEEKDAY_COLUMNS, schedule);
+}
+
+/** Draw the Weekends tab: home Sat–Sun, then travel Fri–Sun. Returns any overlap problems found. */
+function drawWeekends_(schedule) {
+  return drawGrid_(TABS.weekends, WEEKEND_COLUMNS, schedule);
 }
 
 /**

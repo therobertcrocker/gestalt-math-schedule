@@ -24,6 +24,7 @@ const TABS = Object.freeze({
   plan: 'Week Plan',
   breakdowns: 'Breakdowns',
   weekdays: 'Weekdays',
+  weekends: 'Weekends',
 });
 
 /** Full day names for grid headers. */
@@ -38,7 +39,7 @@ const DAYS = Object.freeze(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
 const GRIDS = Object.freeze({
   'Weekday': Object.freeze(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']),
   'Weekend - Home': Object.freeze(['Sat', 'Sun']),
-  'Weekend - Travel': Object.freeze(['Sat', 'Sun']),
+  'Weekend - Travel': Object.freeze(['Fri', 'Sat', 'Sun']),   // travel weekends start Friday
 });
 
 /** Catalog "Side" values: which column of a day an item is drawn in. */
@@ -120,6 +121,12 @@ const LAYOUT = Object.freeze({
 
 /** Days drawn on the Weekdays tab, left to right. */
 const WEEKDAY_COLUMNS = Object.freeze(['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => Object.freeze({ day, grid: 'Weekday', title: DAY_NAMES[day] })));
+
+/** Days drawn on the Weekends tab, left to right: the home weekend, then the travel weekend (which starts Friday). */
+const WEEKEND_COLUMNS = Object.freeze([
+  ...GRIDS['Weekend - Home'].map(day => Object.freeze({ day, grid: 'Weekend - Home', title: `${DAY_NAMES[day]} · Home` })),
+  ...GRIDS['Weekend - Travel'].map(day => Object.freeze({ day, grid: 'Weekend - Travel', title: `${DAY_NAMES[day]} · Travel` })),
+]);
 
 // ---------------------------------------------------------------- look (plain for now; styling comes later)
 

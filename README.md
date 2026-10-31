@@ -16,7 +16,7 @@ You only type into the data tabs. Everything else is drawn from them.
 | Week Plan | yes | When each item happens: item, optional label, days (`Mon-Fri`, `Tue, Thu`), start, end, which grid |
 | Breakdowns | steps only | One group per checked item, by start time. You type Step and Min; the clock-time view beside it is drawn. A step with no minutes is a ◆ marker |
 | Weekdays | no | Mon–Fri, drawn from the Week Plan in the original grid's layout (30-minute chunks, 10 columns per day) |
-| Weekends | no | Home and Travel weekends *(coming)* |
+| Weekends | no | Home Sat–Sun and Travel Fri–Sun side by side, same layout as Weekdays. Week Plan Grid = `Weekend - Home` / `Weekend - Travel` |
 | Stats | no | Hours per category against targets *(coming)* |
 
 ## Where things are
@@ -29,7 +29,7 @@ any other directly, and names must be unique across all files.
 | `Config.js` | Every setting: tab names, column layouts, days, grids, the time range |
 | `Data.js` | Reading the data tabs into plain objects, and reporting rows that can't be used |
 | `Breakdowns.js` | The Breakdowns tab: reading typed steps, grouping by checked item, the clock-time views, single-group repaints |
-| `Grid.js` | The week grids: placing Week Plan rows into 30-minute chunks, overlap checks, the grid layout |
+| `Grid.js` | The week grids (Weekdays, Weekends): placing Week Plan rows into 30-minute chunks, overlap checks, label boxes |
 | `Triggers.js` | Entry points: the 🗓️ Schedule menu, `onEdit` auto-redraw, the document lock |
 | `Drawing.js` | Helpers every drawn tab uses: clearing a sheet, the batched row painter, reporting data problems |
 
@@ -63,7 +63,8 @@ computer. `test/fixtures/schedule.json` is a copy of the real data tabs.
 - `test/breakdowns.js`: typed steps survive every redraw, views follow the Week Plan, overflow is flagged,
   markers and per-item row sizes, unchecking/rechecking keeps steps, a single-group repaint matches a full redraw.
 - `test/grid.js`: every label lands in the same cell as on the hand-built Schedule Planning tab, with the same
-  bars, row heights and column widths; overlaps are reported.
+  bars, row heights and column widths; label boxes; overlaps are reported; Weekends puts home and travel days
+  side by side.
 
 ## Workflow
 

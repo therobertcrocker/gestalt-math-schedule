@@ -24,7 +24,7 @@ function refreshBreakdowns() {
 function drawAll_() {
   const schedule = readSchedule_();
   drawBreakdowns_(schedule);
-  const gridProblems = drawWeekdays_(schedule);
+  const gridProblems = [...drawWeekdays_(schedule), ...drawWeekends_(schedule)];
   reportProblems_([...schedule.problems, ...gridProblems]);
 }
 
