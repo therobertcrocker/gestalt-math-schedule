@@ -1,6 +1,6 @@
 // The Breakdowns tab (drawn, view only): one group per item with Breakdown checked on the Catalog, ordered by
-// start time. On the left, the item's steps as typed on the Steps tab; on the right, a view of those steps at clock
-// time, one view per distinct time slot the item has on the Week Plan, flagging steps that run past the slot.
+// start time. Each group shows the item's steps (typed on the Steps tab) at clock time, one view per distinct time
+// slot the item has on the Week Plan, flagging steps that run past the slot.
 //
 // Nothing here is typed by hand, so the tab is simply redrawn whole from the schedule.
 
@@ -47,17 +47,14 @@ function slotsFor_(name, plan) {
  * columns the widest group needs.
  */
 function layoutBreakdowns_(groups) {
-  const c = BREAKDOWNS.col;
   const rows = [];
   const add = () => { const row = new Map(); rows.push(row); return row; };
   const viewCount = Math.max(1, ...groups.map(g => Math.max(1, g.slots.length)));
+  const left = viewColumn_(0, 0);
 
-  // Title, hint, headers
-  add().set(c.step, { value: 'Breakdowns', bold: true, size: 14 });
-  add().set(c.step, { value: `Drawn from the ${TABS.steps} tab: type steps there. Check Breakdown on the ${TABS.catalog} to add an item.`, color: COLOR.muted });
-  const headers = add();
-  headers.set(c.step, { value: 'Step', bold: true });
-  headers.set(c.min, { value: 'Min', bold: true, halign: 'center' });
+  // Title and hint
+  add().set(left, { value: 'Breakdowns', bold: true, size: 14 });
+  add().set(left, { value: `Drawn from the ${TABS.steps} tab: type steps there. Check Breakdown on the ${TABS.catalog} to add an item.`, color: COLOR.muted });
 
   groups.forEach(g => {
     layoutGroup_(g, add);
@@ -66,26 +63,19 @@ function layoutBreakdowns_(groups) {
   return { rows, viewCount };
 }
 
-/** One group: a title row, then its steps on the left and one view per slot on the right, side by side. */
+/** One group: the item's name, then one view per slot side by side (a slot title row, then the view's rows). */
 function layoutGroup_(g, add) {
-  const c = BREAKDOWNS.col;
   const total = g.steps.reduce((sum, s) => sum + s.min, 0);
   const slots = g.slots.length ? g.slots : [{ start: null, end: null, days: [], grids: [] }];
   const views = slots.map(slot => viewCells_(g, slot, total));
-  const bodyRows = Math.max(g.steps.length, ...views.map(v => v.body.length));
 
+  add().set(viewColumn_(0, BREAKDOWNS.view.time), { value: g.item.name, bold: true, size: 12 });
   const title = add();
-  title.set(c.step, { value: g.item.name, bold: true, bg: COLOR.titleBand });
-  title.set(c.min, { value: `${total} min`, bg: COLOR.titleBand, halign: 'center', color: COLOR.muted });
   views.forEach((v, k) => v.title.forEach((cell, offset) => title.set(viewColumn_(k, offset), cell)));
 
+  const bodyRows = Math.max(...views.map(v => v.body.length));
   for (let i = 0; i < bodyRows; i++) {
     const row = add();
-    const s = g.steps[i];
-    if (s) {
-      row.set(c.step, { value: s.step });
-      row.set(c.min, { value: s.min, halign: 'center' });
-    }
     views.forEach((v, k) => (v.body[i] || new Map()).forEach((cell, offset) => row.set(viewColumn_(k, offset), cell)));
   }
 }
@@ -158,11 +148,8 @@ function paintPage_(sh, page) {
   fitSheetSize_(sh, page.rows.length, nCols);
   paintRows_(sh, 1, page.rows, nCols);
 
-  // Column widths: margin, step, min, gap, then each view
+  // Column widths: margin, then each view
   sh.setColumnWidth(c.margin, w.margin);
-  sh.setColumnWidth(c.step, w.step);
-  sh.setColumnWidth(c.min, w.min);
-  sh.setColumnWidth(c.min + 1, w.gap);
   for (let k = 0; k < page.viewCount; k++) {
     [w.time, w.bar, w.label, w.bar, w.gap].forEach((px, offset) => sh.setColumnWidth(viewColumn_(k, offset), px));
   }

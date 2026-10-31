@@ -42,8 +42,16 @@ function rows(sh) {
   });
 }
 
-/** Index (0-based) of an item's title row on Breakdowns. */
-const titleAt = (r, name) => r.findIndex((row) => row[1] === name && /min$/.test(String(row[2])));
+/**
+ * Index (0-based) of an item's slot-title row on Breakdowns: the row right under its name row. View columns:
+ * B time, C bar, D label, E bar, F gap; a second view starts at G (label in I).
+ */
+const titleAt = (r, name) => {
+  const nameRow = r.findIndex((row, i) => row[1] === name && row.length === 2 && i >= 2);
+  return nameRow < 0 ? -1 : nameRow + 1;
+};
+const TIME = 1;
+const LABEL = 3;
 
 /** Type values into cells the way a person would, then fire onEdit. */
 function type(app, sh, row, col, values) {
@@ -98,10 +106,10 @@ test('editing Steps redraws Breakdowns; editing Breakdowns or Categories does no
   const { app, book, steps, view } = drawn({ Steps: [['Item', 'Step', 'Min'], ['Daily Prep'], ['', 'Shower', 10]] });
   type(app, steps, 3, 3, [20]);
   const r = rows(view);
-  assert.strictEqual(r[titleAt(r, 'Daily Prep')][6], '7:00 AM – 7:30 AM · Mon–Fri · 20 of 30 min');
+  assert.strictEqual(r[titleAt(r, 'Daily Prep')][LABEL], '7:00 AM – 7:30 AM · Mon–Fri · 20 of 30 min');
   let calls = 0;
   app.drawAll_ = () => { calls++; };
-  app.onEdit({ range: view.getRange(6, 2) });
+  app.onEdit({ range: view.getRange(6, 4) });
   app.onEdit({ range: book.getSheetByName('Categories').getRange(2, 2) });
   assert.strictEqual(calls, 0);
 });
@@ -114,66 +122,66 @@ const prep = (list) => drawn({ Steps: [['Item', 'Step', 'Min'], ['Daily Prep'], 
 test('groups are ordered by start time, each titled with its slot', () => {
   const r = rows(prep([]).view);
   assert.ok(titleAt(r, 'Wake-Up') < titleAt(r, 'Daily Prep'));
-  assert.strictEqual(r[titleAt(r, 'Wake-Up')][6], '6:30 AM – 7:00 AM · Mon–Fri · 0 of 30 min');
+  assert.strictEqual(r[titleAt(r, 'Wake-Up')][LABEL], '6:30 AM – 7:00 AM · Mon–Fri · 0 of 30 min');
 });
 
-test('steps sit at clock time, with the step list beside them', () => {
+test('each group is a name row, a slot title, then steps at clock time', () => {
   const r = rows(prep([['A', 10], ['B', 15], ['Plan the day', 5]]).view);
   const t = titleAt(r, 'Daily Prep');
-  assert.deepStrictEqual([r[t][2], r[t][6]], ['30 min', '7:00 AM – 7:30 AM · Mon–Fri · 30 of 30 min']);
-  assert.deepStrictEqual([r[t + 1][1], r[t + 1][2]], ['A', 10]);
-  assert.deepStrictEqual([r[t + 1][4], r[t + 1][6]], ['7:00 AM', 'A']);
-  assert.deepStrictEqual([r[t + 3][4], r[t + 3][6]], ['7:10 AM', 'B']);
-  assert.deepStrictEqual([r[t + 6][4], r[t + 6][6]], ['7:25 AM', 'Plan the day']);
+  assert.deepStrictEqual(r[t - 1], ['', 'Daily Prep'], 'name row, nothing else on it');
+  assert.strictEqual(r[t][LABEL], '7:00 AM – 7:30 AM · Mon–Fri · 30 of 30 min');
+  assert.deepStrictEqual([r[t + 1][TIME], r[t + 1][LABEL]], ['7:00 AM', 'A']);
+  assert.deepStrictEqual([r[t + 3][TIME], r[t + 3][LABEL]], ['7:10 AM', 'B']);
+  assert.deepStrictEqual([r[t + 6][TIME], r[t + 6][LABEL]], ['7:25 AM', 'Plan the day']);
 });
 
 test('unused time in the slot is shown as free', () => {
   const r = rows(prep([['A', 15], ['B', 5]]).view);
   const t = titleAt(r, 'Daily Prep');
-  assert.deepStrictEqual([r[t + 5][4], r[t + 5][6]], ['7:20 AM', 'free · 10 min']);
+  assert.deepStrictEqual([r[t + 5][TIME], r[t + 5][LABEL]], ['7:20 AM', 'free · 10 min']);
 });
 
 test('a step with no minutes is a marker at its moment, sharing a row if needed', () => {
   const r = rows(prep([['A', 20], ['B', ''], ['Meds', '']]).view);
   const t = titleAt(r, 'Daily Prep');
-  assert.deepStrictEqual([r[t + 5][4], r[t + 5][6]], ['7:20 AM', '◆ B · ◆ Meds · free · 10 min']);
+  assert.deepStrictEqual([r[t + 5][TIME], r[t + 5][LABEL]], ['7:20 AM', '◆ B · ◆ Meds · free · 10 min']);
 });
 
 test('steps past the end of the slot are flagged', () => {
   const { book, view } = prep([['A', 20], ['B', 15]]);
   const r = rows(view);
   const t = titleAt(r, 'Daily Prep');
-  assert.strictEqual(r[t][6], '7:00 AM – 7:30 AM · Mon–Fri · 35 of 30 min');
+  assert.strictEqual(r[t][LABEL], '7:00 AM – 7:30 AM · Mon–Fri · 35 of 30 min');
   const cells = book.dump().sheets.Breakdowns.cells;
-  assert.strictEqual(cells[`G${t + 1}`].fmt.color, '#CC0000', 'title turns red');
-  assert.strictEqual(cells[`F${t + 1 + 7}`].fmt.bg, '#E06666', 'the 7th view row (7:30) is past the slot');
-  assert.strictEqual(cells[`F${t + 1 + 6}`].fmt.bg, '#F9CB9C', 'the 6th view row is still inside it');
+  assert.strictEqual(cells[`D${t + 1}`].fmt.color, '#CC0000', 'title turns red');
+  assert.strictEqual(cells[`C${t + 1 + 7}`].fmt.bg, '#E06666', 'the 7th view row (7:30) is past the slot');
+  assert.strictEqual(cells[`C${t + 1 + 6}`].fmt.bg, '#F9CB9C', 'the 6th view row is still inside it');
 });
 
 test('View min 1 gives one row per minute, so short steps each get their own label', () => {
   const r = rows(drawn({ Steps: [['Item', 'Step', 'Min'], ['Wake-Up'], ['', 'Brush teeth', 2], ['', 'Floss', 1], ['', 'Wash face', 3]] }).view);
   const t = titleAt(r, 'Wake-Up');
   const d = titleAt(r, 'Daily Prep');
-  assert.strictEqual(d - t - 2, 30, '30 one-minute rows, then the blank row between groups');
-  assert.deepStrictEqual([r[t + 1][4], r[t + 1][6]], ['6:30 AM', 'Brush teeth']);
-  assert.deepStrictEqual([r[t + 3][4], r[t + 3][6]], ['6:32 AM', 'Floss']);
-  assert.deepStrictEqual([r[t + 4][4], r[t + 4][6]], ['6:33 AM', 'Wash face']);
-  assert.deepStrictEqual([r[t + 7][4], r[t + 7][6]], ['6:36 AM', 'free · 24 min']);
+  assert.strictEqual(d - t - 3, 30, '30 one-minute rows, the blank row between groups, then the next name row');
+  assert.deepStrictEqual([r[t + 1][TIME], r[t + 1][LABEL]], ['6:30 AM', 'Brush teeth']);
+  assert.deepStrictEqual([r[t + 3][TIME], r[t + 3][LABEL]], ['6:32 AM', 'Floss']);
+  assert.deepStrictEqual([r[t + 4][TIME], r[t + 4][LABEL]], ['6:33 AM', 'Wash face']);
+  assert.deepStrictEqual([r[t + 7][TIME], r[t + 7][LABEL]], ['6:36 AM', 'free · 24 min']);
 });
 
 test('an item with two different slots gets two views side by side', () => {
   const { view } = drawn({}, (tabs) => tabs['Week Plan'].push(['Wake-Up', '', 'Sat-Sun', '8:00 AM', '8:30 AM', 'Weekend - Home', '']));
   const r = rows(view);
   const wake = r[titleAt(r, 'Wake-Up')];
-  assert.strictEqual(wake[6], '6:30 AM – 7:00 AM · Mon–Fri · 0 of 30 min');
-  assert.strictEqual(wake[11], '8:00 AM – 8:30 AM · Sat–Sun · 0 of 30 min');
+  assert.strictEqual(wake[LABEL], '6:30 AM – 7:00 AM · Mon–Fri · 0 of 30 min');
+  assert.strictEqual(wake[LABEL + 5], '8:00 AM – 8:30 AM · Sat–Sun · 0 of 30 min');
 });
 
 test('moving an item on the Week Plan moves its view', () => {
   const { app, book, view } = prep([]);
   type(app, book.getSheetByName('Week Plan'), 3, 4, ['7:15 AM', '7:45 AM']);
   const r = rows(view);
-  assert.strictEqual(r[titleAt(r, 'Daily Prep')][6], '7:15 AM – 7:45 AM · Mon–Fri · 0 of 30 min');
+  assert.strictEqual(r[titleAt(r, 'Daily Prep')][LABEL], '7:15 AM – 7:45 AM · Mon–Fri · 0 of 30 min');
 });
 
 test('Breakdowns is sized exactly to its content, and redrawing changes nothing', () => {

@@ -16,7 +16,7 @@ type in (its only write to an input tab is adding a heading on Steps when you ch
 | Catalog | yes | Every item: which side of the grid (Schedule / Activities), category, color, description, Breakdown checkbox, View min (minutes per Breakdowns view row; blank = 5) |
 | Week Plan | yes | When each item happens: item, optional label, days (`Mon-Fri`, `Tue, Thu`), start, end, which grid |
 | Steps | yes | Routine steps, grouped: a heading row with the item's name, then its steps (Step, Min). A step with no minutes is a ◆ marker in the view |
-| Breakdowns | no | One group per checked item, by start time: its steps beside a clock-time view of its Week Plan slot, flagging steps that run over |
+| Breakdowns | no | One group per checked item, by start time: its steps at clock time in its Week Plan slot, flagging steps that run over |
 | Weekdays | no | Mon–Fri, drawn from the Week Plan in the original grid's layout (30-minute chunks, 10 columns per day) |
 | Weekends | no | Home Sat–Sun and Travel Fri–Sun side by side, same layout as Weekdays. Week Plan Grid = `Weekend - Home` / `Weekend - Travel` |
 | Stats | no | Hours per category against targets *(coming)* |

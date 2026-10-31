@@ -91,18 +91,18 @@ const LEGACY_BREAKDOWNS = Object.freeze({ readFrom: 2, titleMark: '§', hiddenMa
 // ---------------------------------------------------------------- Breakdowns layout (drawn, view only)
 
 /**
- * Breakdowns tab. Rows 1–3 are the title, a hint and column headers; groups start below, one per item with
- * Breakdown checked, ordered by start time. Left: the item's steps (read-only copy of Steps). Right: one view per
- * distinct time slot of the item, each `view.width` columns wide.
+ * Breakdowns tab. Rows 1–2 are the title and a hint; groups start below, one per item with Breakdown checked,
+ * ordered by start time. Each group is a name row, then one view per distinct time slot of the item side by side,
+ * each `view.width` columns wide: a slot title row, then one row per `viewMinutes`.
  */
 const BREAKDOWNS = Object.freeze({
-  firstRow: 4,
+  firstRow: 3,
   minutesPerRow: 5,                       // default minutes per view row (Catalog "View min" overrides per item)
   marker: '◆ ',                           // prefix for a step with no minutes (a moment, not a span)
-  col: Object.freeze({ margin: 1, step: 2, min: 3, firstView: 5 }),
+  col: Object.freeze({ margin: 1, firstView: 2 }),
   // Inside one view, columns counted from its first: time · bar · label · bar · gap
   view: Object.freeze({ time: 0, barLeft: 1, label: 2, barRight: 3, width: 5 }),
-  widths: Object.freeze({ margin: 20, step: 220, min: 50, gap: 24, time: 70, bar: 14, label: 190 }),
+  widths: Object.freeze({ margin: 20, gap: 24, time: 70, bar: 14, label: 220 }),
 });
 
 // ---------------------------------------------------------------- grid layout (Weekdays / Weekends)
